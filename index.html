@@ -1,0 +1,3242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlowScript</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg-dark: #09090b;
+      --bg-editor: #111113;
+      --bg-canvas: #09090b;
+      --bg-surface: #18181b;
+      --bg-sidebar: #0f0f11;
+      --border: #27272a;
+      --border-hover: #3f3f46;
+      --text: #fafafa;
+      --text-dim: #71717a;
+      --text-muted: #52525b;
+      --accent: #22c55e;
+      --accent-dim: #14532d;
+      --accent-hover: #16a34a;
+      --node-fill: #18181b;
+      --node-stroke: #3f3f46;
+      --node-text: #fafafa;
+      --edge-stroke: #52525b;
+      --group-fill: rgba(39, 39, 42, 0.5);
+      --group-stroke: #3f3f46;
+    }
+
+    [data-theme="light"] {
+      --bg-dark: #fafafa;
+      --bg-editor: #ffffff;
+      --bg-canvas: #f4f4f5;
+      --bg-surface: #ffffff;
+      --bg-sidebar: #f4f4f5;
+      --border: #e4e4e7;
+      --border-hover: #d4d4d8;
+      --text: #09090b;
+      --text-dim: #71717a;
+      --text-muted: #a1a1aa;
+      --accent: #16a34a;
+      --accent-dim: #dcfce7;
+      --accent-hover: #15803d;
+      --node-fill: #ffffff;
+      --node-stroke: #d4d4d8;
+      --node-text: #09090b;
+      --edge-stroke: #a1a1aa;
+      --group-fill: rgba(244, 244, 245, 0.8);
+      --group-stroke: #d4d4d8;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-dark);
+      gap: 12px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .logo {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.3px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      width: 26px;
+      height: 26px;
+      background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .logo-icon svg {
+      width: 14px;
+      height: 14px;
+      stroke: white;
+    }
+
+    .project-name {
+      padding: 4px 10px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: 12px;
+      color: var(--text-dim);
+    }
+
+    .project-name strong {
+      color: var(--text);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn {
+      padding: 6px 12px;
+      border-radius: 5px;
+      border: 1px solid var(--border);
+      background: var(--bg-surface);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .btn:hover {
+      border-color: var(--border-hover);
+      background: var(--border);
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-hover);
+    }
+
+    .btn-icon {
+      padding: 6px;
+      min-width: 28px;
+      justify-content: center;
+    }
+
+    .btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .btn-ghost {
+      border-color: transparent;
+      background: transparent;
+    }
+
+    .btn-ghost:hover {
+      background: var(--border);
+      border-color: transparent;
+    }
+
+    /* Main Layout */
+    .main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* Sidebar - File Tree */
+    .sidebar {
+      width: 220px;
+      min-width: 180px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sidebar-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-dim);
+    }
+
+    .sidebar-actions {
+      display: flex;
+      gap: 2px;
+    }
+
+    .sidebar-btn {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .sidebar-btn:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .sidebar-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .sidebar-btn.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .file-tree {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 0;
+    }
+
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text-dim);
+      transition: all 0.1s;
+      position: relative;
+    }
+
+    .file-item:hover {
+      background: var(--border);
+      color: var(--text);
+    }
+
+    .file-item.active {
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .file-item.modified::after {
+      content: '●';
+      font-size: 8px;
+      color: var(--accent);
+      margin-left: 4px;
+    }
+
+    .file-time {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+
+    .file-item.modified .file-time {
+      display: none;
+    }
+
+    .file-item svg.file-icon {
+      width: 14px;
+      height: 14px;
+      flex-shrink: 0;
+    }
+
+    .file-delete-btn {
+      width: 18px;
+      height: 18px;
+      padding: 2px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.15s, color 0.15s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+      margin-left: auto;
+    }
+
+    .file-delete-btn:hover {
+      color: #ef4444;
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .file-item:hover .file-delete-btn {
+      opacity: 1;
+    }
+
+    .file-delete-btn svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .file-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-state {
+      padding: 20px;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+    }
+
+    .empty-state p {
+      margin-bottom: 12px;
+    }
+
+    /* Version History Styles */
+    .version-item {
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      background: var(--bg-dark);
+    }
+
+    .version-item:hover {
+      border-color: var(--text-muted);
+    }
+
+    .version-item.current {
+      border-color: var(--accent);
+      background: rgba(34, 197, 94, 0.1);
+    }
+
+    .version-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 6px;
+    }
+
+    .version-comment {
+      font-weight: 500;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .version-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+
+    .version-meta {
+      font-size: 11px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+    }
+
+    .version-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .version-actions button {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+    .version-current-badge {
+      display: inline-block;
+      padding: 2px 6px;
+      background: var(--accent);
+      color: white;
+      border-radius: 3px;
+      font-size: 10px;
+      font-weight: 500;
+      margin-left: 8px;
+    }
+
+    .diff-add {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .diff-remove {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .diff-line {
+      display: block;
+      padding: 1px 4px;
+      margin: 0 -4px;
+    }
+
+    /* Editor Panel */
+    .editor-panel {
+      width: 380px;
+      min-width: 280px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+      background: var(--bg-editor);
+    }
+
+    .panel-header {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .panel-title {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-title svg {
+      width: 14px;
+      height: 14px;
+      color: var(--text-dim);
+    }
+
+    .panel-actions {
+      display: flex;
+      gap: 4px;
+    }
+
+    .editor-wrapper {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #editor {
+      width: 100%;
+      height: 100%;
+      padding: 12px;
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+
+    .editor-footer {
+      padding: 6px 12px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+
+    .status-dot.error {
+      background: #ef4444;
+    }
+
+    .status-dot.modified {
+      background: #eab308;
+    }
+
+    /* Canvas Panel */
+    .canvas-panel {
+      flex: 1;
+      background: var(--bg-canvas);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .canvas-container {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+
+    .canvas-container:active {
+      cursor: grabbing;
+    }
+
+    #canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .canvas-controls {
+      position: absolute;
+      bottom: 12px;
+      right: 12px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .control-group {
+      display: flex;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .canvas-btn {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      border-radius: 4px;
+    }
+
+    .canvas-btn:hover {
+      background: var(--border);
+    }
+
+    .canvas-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .zoom-display {
+      padding: 0 8px;
+      font-size: 11px;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+    }
+
+    .grid-pattern {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    /* Resize Handles */
+    .resize-handle {
+      width: 3px;
+      background: transparent;
+      cursor: col-resize;
+    }
+
+    .resize-handle:hover {
+      background: var(--accent);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      padding: 20px;
+    }
+
+    .modal h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .modal p {
+      font-size: 13px;
+      color: var(--text-dim);
+      margin-bottom: 16px;
+      line-height: 1.5;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+    }
+
+    .toast {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      padding: 10px 16px;
+      border-radius: 6px;
+      font-size: 13px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      animation: slideUp 0.2s ease;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* No Project State */
+    .no-project {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--text-dim);
+    }
+
+    .no-project-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--bg-surface);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .no-project-icon svg {
+      width: 32px;
+      height: 32px;
+      stroke: var(--text-muted);
+    }
+
+    .no-project h2 {
+      font-size: 18px;
+      color: var(--text);
+    }
+
+    .no-project p {
+      font-size: 13px;
+      max-width: 300px;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    .no-project-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    /* Keyboard shortcut hints */
+    kbd {
+      background: var(--bg-dark);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 2px 5px;
+      font-size: 11px;
+      font-family: inherit;
+    }
+
+    /* Mobile */
+    @media (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+      .editor-panel {
+        width: 100% !important;
+      }
+      .canvas-panel.hidden {
+        display: none;
+      }
+      .editor-panel.hidden {
+        display: none;
+      }
+    }
+
+    /* Help content in modal */
+    .help-section {
+      margin-bottom: 16px;
+    }
+    
+    .help-section h3 {
+      font-size: 12px;
+      color: var(--accent);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .help-section pre {
+      background: var(--bg-dark);
+      padding: 10px;
+      border-radius: 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      line-height: 1.5;
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-left">
+        <div class="logo">
+          <div class="logo-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M4 4h6v6H4zM14 4h6v6h-6zM9 14h6v6H9z"/>
+              <path d="M7 10v4M17 10v1c0 1.5-1 3-3 3h-2"/>
+            </svg>
+          </div>
+          FlowScript
+          <span style="font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 6px;">v0.1.5</span>
+        </div>
+        <div class="project-name" id="projectName">
+          <span id="projectLabel">No project open</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn" id="openFolderHeaderBtn" title="Open project folder (Ctrl+O)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
+          </svg>
+          Open Folder
+        </button>
+        <button class="btn btn-ghost" id="helpBtn" title="Help">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
+          </svg>
+        </button>
+        <button class="btn btn-ghost" id="themeBtn" title="Toggle theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+          </svg>
+        </button>
+        <div class="btn-group">
+          <button class="btn" id="exportSvgBtn" title="Export diagram as SVG">SVG</button>
+          <button class="btn" id="exportPngBtn" title="Export diagram as PNG">PNG</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="main" id="mainContent">
+      <!-- No Project State -->
+      <div class="no-project" id="noProjectState">
+        <div class="no-project-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
+          </svg>
+        </div>
+        <h2>Open a Project Folder</h2>
+        <p>Select a folder to store your flowcharts. FlowScript will read and save .flow files directly to your local file system.</p>
+        <div class="no-project-actions">
+          <button class="btn btn-primary" id="openFolderBtn">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
+            </svg>
+            Open Folder
+          </button>
+        </div>
+        <p style="font-size: 11px; margin-top: 16px;">
+          Or drag & drop a folder here
+        </p>
+      </div>
+
+      <!-- Project View (hidden by default) -->
+      <div class="sidebar" id="sidebar" style="display: none;">
+        <div class="sidebar-header">
+          <span class="sidebar-title">Files</span>
+          <div class="sidebar-actions">
+            <button class="sidebar-btn" id="openFolderSidebarBtn" title="Open folder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
+              </svg>
+            </button>
+            <div style="width: 1px; height: 16px; background: var(--border); margin: 0 2px;"></div>
+            <button class="sidebar-btn active" id="sortNameBtn" data-sort="name" title="Sort by name">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 6h12M3 12h9M3 18h6M18 6v12M15 15l3 3 3-3"/>
+              </svg>
+            </button>
+            <button class="sidebar-btn" id="sortRecentBtn" data-sort="recent" title="Sort by recent">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>
+              </svg>
+            </button>
+            <div style="width: 1px; height: 16px; background: var(--border); margin: 0 2px;"></div>
+            <button class="sidebar-btn" id="newFileBtn" title="New file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </button>
+            <button class="sidebar-btn" id="refreshBtn" title="Refresh">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="file-tree" id="fileTree">
+          <div class="empty-state">
+            <p>No .flow files yet</p>
+            <button class="btn" id="createFirstBtn">Create first file</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="resize-handle" id="sidebarResize" style="display: none;"></div>
+
+      <div class="editor-panel" id="editorPanel" style="display: none;">
+        <div class="panel-header">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/>
+              <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+            </svg>
+            <span id="currentFileName">untitled.flow</span>
+          </div>
+        </div>
+        <div class="editor-wrapper">
+          <textarea id="editor" spellcheck="false" placeholder="// Start typing your flowchart...
+
+Start [shape: oval]
+Process
+End [shape: oval]
+
+Start > Process
+Process > End"></textarea>
+        </div>
+        <div class="editor-footer">
+          <div class="status-indicator">
+            <div class="status-dot" id="statusDot"></div>
+            <span id="statusText">Ready</span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <button class="btn" id="versionsBtn" title="Version History" style="padding: 4px 8px; font-size: 11px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              History
+            </button>
+            <span id="saveStatus"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="resize-handle" id="editorResize" style="display: none;"></div>
+
+      <div class="canvas-panel" id="canvasPanel" style="display: none;">
+        <svg class="grid-pattern" id="gridPattern"></svg>
+        <div class="canvas-container" id="canvasContainer">
+          <svg id="canvas"></svg>
+        </div>
+        <div class="canvas-controls">
+          <div class="control-group">
+            <button class="canvas-btn" id="zoomOutBtn" title="Zoom out">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/>
+              </svg>
+            </button>
+            <span class="zoom-display" id="zoomDisplay">100%</span>
+            <button class="canvas-btn" id="zoomInBtn" title="Zoom in">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6"/>
+              </svg>
+            </button>
+          </div>
+          <div class="control-group">
+            <button class="canvas-btn" id="fitBtn" title="Fit to view">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Help Modal -->
+  <div class="modal-overlay" id="helpModal">
+    <div class="modal" style="max-width: 600px; max-height: 80vh; overflow-y: auto;">
+      <h2>FlowScript Quick Reference</h2>
+      <p style="font-size: 12px; color: var(--text-dim); margin-bottom: 16px;">Eraser.io compatible syntax</p>
+      
+      <div class="help-section">
+        <h3>Nodes with Properties</h3>
+        <pre>Start [shape: oval]
+Check [shape: diamond]
+Input [shape: parallelogram]
+Store [shape: cylinder]
+Process                    // rectangle (default)
+Node [shape: oval, color: green, icon: check]</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Shapes</h3>
+        <pre>rectangle, oval, diamond, cylinder
+parallelogram, document, hexagon
+trapezoid, triangle, ellipse, star</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Text Modes</h3>
+        <pre>Long node name           // wrap (default)
+Node [text: fit]         // shrink font to fit
+Node [text: clip]        // truncate with ...</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Connections</h3>
+        <pre>A > B                   // Arrow
+A > B: label            // With label
+A > B > C               // Chain
+A > B, C, D             // Branching
+A - B                   // Line (no arrow)
+A -- B                  // Dotted line
+A --> B                 // Dotted arrow
+A <> B                  // Bidirectional</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Groups</h3>
+        <pre>Backend [color: blue] {
+  API [icon: api]
+  Database [shape: cylinder]
+}
+
+Frontend > Backend: REST API</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Direction</h3>
+        <pre>direction down    // default
+direction up
+direction right
+direction left</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Keyboard Shortcuts</h3>
+        <pre>Ctrl+S          Save version (with comment)
+Ctrl+N          New file
+Ctrl+O          Open folder</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Version History</h3>
+        <pre>• Auto-saves every 5 minutes
+• Click "History" to view versions
+• Compare, preview, and restore
+• Ctrl+S to save with description</pre>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-primary" onclick="document.getElementById('helpModal').classList.remove('active')">Got it</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirmation Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal">
+      <h2>Delete File?</h2>
+      <p>Are you sure you want to delete <strong id="deleteFileName"></strong>? This cannot be undone.</p>
+      <div class="modal-actions">
+        <button class="btn" onclick="document.getElementById('deleteModal').classList.remove('active')">Cancel</button>
+        <button class="btn" style="background: #ef4444; border-color: #ef4444; color: white;" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New File Modal -->
+  <div class="modal-overlay" id="newFileModal">
+    <div class="modal">
+      <h2>New File</h2>
+      <p>Enter a name for your new flowchart:</p>
+      <input type="text" id="newFileInput" placeholder="my-flowchart" style="
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 16px;
+        background: var(--bg-dark);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 14px;
+        outline: none;
+      ">
+      <div class="modal-actions">
+        <button class="btn" onclick="document.getElementById('newFileModal').classList.remove('active')">Cancel</button>
+        <button class="btn btn-primary" id="confirmNewFileBtn">Create</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Save Version Modal -->
+  <div class="modal-overlay" id="saveVersionModal">
+    <div class="modal">
+      <h2>Save Version</h2>
+      <p>Add a description for this version:</p>
+      <input type="text" id="versionCommentInput" placeholder="e.g., Added login flow" style="
+        width: 100%;
+        padding: 10px;
+        margin-bottom: 16px;
+        background: var(--bg-dark);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-family: inherit;
+        font-size: 14px;
+        outline: none;
+      ">
+      <div class="modal-actions">
+        <button class="btn" onclick="document.getElementById('saveVersionModal').classList.remove('active')">Cancel</button>
+        <button class="btn btn-primary" id="confirmSaveVersionBtn">Save Version</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Version History Modal -->
+  <div class="modal-overlay" id="versionHistoryModal">
+    <div class="modal" style="max-width: 700px; max-height: 80vh; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h2 style="margin: 0;">Version History</h2>
+        <button class="btn btn-primary" id="saveNewVersionBtn" style="padding: 6px 12px; font-size: 12px;">
+          + Save Current
+        </button>
+      </div>
+      <div id="versionList" style="flex: 1; overflow-y: auto; margin: 0 -20px; padding: 0 20px;"></div>
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button class="btn" onclick="document.getElementById('versionHistoryModal').classList.remove('active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Version Compare Modal -->
+  <div class="modal-overlay" id="versionCompareModal">
+    <div class="modal" style="max-width: 900px; max-height: 85vh; display: flex; flex-direction: column;">
+      <h2 style="margin-bottom: 16px;">Compare Versions</h2>
+      <div style="display: flex; gap: 16px; margin-bottom: 12px;">
+        <div style="flex: 1;">
+          <label style="font-size: 12px; color: var(--text-dim);">Version: <span id="compareLeftLabel"></span></label>
+        </div>
+        <div style="flex: 1;">
+          <label style="font-size: 12px; color: var(--text-dim);">Version: <span id="compareRightLabel"></span></label>
+        </div>
+      </div>
+      <div id="compareContainer" style="display: flex; gap: 16px; flex: 1; overflow: hidden;">
+        <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+          <pre id="compareLeft" style="
+            flex: 1;
+            margin: 0;
+            padding: 12px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+          "></pre>
+        </div>
+        <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+          <pre id="compareRight" style="
+            flex: 1;
+            margin: 0;
+            padding: 12px;
+            background: var(--bg-dark);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            overflow: auto;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 11px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            word-break: break-word;
+          "></pre>
+        </div>
+      </div>
+      <div class="modal-actions" style="margin-top: 16px;">
+        <button class="btn" id="restoreVersionBtn" style="background: var(--accent); border-color: var(--accent);">Restore Left Version</button>
+        <button class="btn" onclick="document.getElementById('versionCompareModal').classList.remove('active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/elkjs@0.9.3/lib/elk.bundled.js"></script>
+  <script>
+    // ============================================
+    // FlowScript - Local File System Version
+    // ============================================
+
+    // Check for File System Access API support
+    const hasFileSystemAccess = 'showDirectoryPicker' in window;
+
+    // State
+    let state = {
+      directoryHandle: null,
+      files: new Map(), // filename -> { handle, content, modified, lastUpdated }
+      currentFile: null,
+      zoom: 1,
+      pan: { x: 0, y: 0 },
+      theme: 'dark',
+      sortBy: 'name' // 'name' or 'recent'
+    };
+
+    // DOM Elements
+    const editor = document.getElementById('editor');
+    const canvas = document.getElementById('canvas');
+    const canvasContainer = document.getElementById('canvasContainer');
+    const fileTree = document.getElementById('fileTree');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const zoomDisplay = document.getElementById('zoomDisplay');
+    const saveStatus = document.getElementById('saveStatus');
+
+    const elk = new ELK();
+
+    // Icons for nodes
+    const icons = {
+      server: 'M2 2h20v6H2zm0 8h20v6H2zm0 8h20v4H2zM6 5h.01M6 13h.01M6 19h.01',
+      database: 'M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zM2 9.5c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5',
+      api: 'M4 4h16v16H4zM9 9h6M9 12h6M9 15h3',
+      cache: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
+      postgresql: 'M12 2C8 2 5 5 5 9c0 3 2 6 5 7v4l4-4c3-1 5-4 5-7 0-4-3-7-7-7zM9 9h.01M12 9h.01M15 9h.01',
+      user: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z',
+      lock: 'M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4',
+      mail: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6',
+      globe: 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z',
+      code: 'M16 18l6-6-6-6M8 6l-6 6 6 6',
+      check: 'M20 6L9 17l-5-5',
+      x: 'M18 6L6 18M6 6l12 12',
+      alert: 'M12 2L2 22h20L12 2zM12 9v4M12 17h.01',
+      'aws-lambda': 'M2 20L12 4l10 16H2zM12 4v16',
+      dynamodb: 'M3 5h18v14H3zM3 9h18M3 13h18M7 5v14',
+      docker: 'M3 11h3v3H3zm4 0h3v3H7zm4 0h3v3h-3zm4 0h3v3h-3zM7 7h3v3H7zm4 0h3v3h-3zM11 3h3v3h-3z',
+    };
+
+    // Eraser-compatible shape mapping
+    const shapeMap = {
+      rectangle: { shape: 'rect', radius: 4 },
+      cylinder: { shape: 'cylinder' },
+      diamond: { shape: 'diamond' },
+      document: { shape: 'document' },
+      ellipse: { shape: 'ellipse' },
+      hexagon: { shape: 'hexagon' },
+      oval: { shape: 'stadium' },
+      parallelogram: { shape: 'parallelogram' },
+      star: { shape: 'star' },
+      trapezoid: { shape: 'trapezoid' },
+      triangle: { shape: 'triangle' },
+      // Default
+      default: { shape: 'rect', radius: 4 }
+    };
+
+    const colorPalette = {
+      red: '#ef4444', green: '#22c55e', blue: '#3b82f6',
+      yellow: '#eab308', purple: '#a855f7', orange: '#f97316',
+      pink: '#ec4899', cyan: '#06b6d4', gray: '#6b7280',
+      brown: '#a16207', black: '#18181b', white: '#fafafa'
+    };
+
+    // ============================================
+    // LocalStorage Persistence
+    // ============================================
+
+    const STORAGE_KEY = 'flowscript_demo_files_v2';
+    const VERSIONS_KEY = 'flowscript_versions_v1';
+
+    // Version storage: { filename: [{ id, timestamp, comment, content }, ...] }
+    let fileVersions = {};
+
+    function loadVersions() {
+      try {
+        const saved = localStorage.getItem(VERSIONS_KEY);
+        if (saved) {
+          fileVersions = JSON.parse(saved);
+        }
+      } catch (e) {
+        console.warn('Failed to load versions:', e);
+        fileVersions = {};
+      }
+    }
+
+    function saveVersions() {
+      try {
+        localStorage.setItem(VERSIONS_KEY, JSON.stringify(fileVersions));
+      } catch (e) {
+        console.warn('Failed to save versions:', e);
+      }
+    }
+
+    function getFileVersions(filename) {
+      return fileVersions[filename] || [];
+    }
+
+    function addVersion(filename, content, comment) {
+      if (!fileVersions[filename]) {
+        fileVersions[filename] = [];
+      }
+      
+      const version = {
+        id: Date.now().toString(36) + Math.random().toString(36).substr(2, 5),
+        timestamp: Date.now(),
+        comment: comment || 'Auto-save',
+        content: content
+      };
+      
+      fileVersions[filename].unshift(version); // Add to beginning
+      
+      // Keep only last 50 versions per file
+      if (fileVersions[filename].length > 50) {
+        fileVersions[filename] = fileVersions[filename].slice(0, 50);
+      }
+      
+      saveVersions();
+      return version;
+    }
+
+    function deleteVersion(filename, versionId) {
+      if (!fileVersions[filename]) return;
+      fileVersions[filename] = fileVersions[filename].filter(v => v.id !== versionId);
+      saveVersions();
+    }
+
+    function formatVersionTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diffMs = now - date;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+      
+      if (diffMins < 1) return 'Just now';
+      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffDays < 7) return `${diffDays}d ago`;
+      
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+    }
+
+    function formatFullTime(timestamp) {
+      return new Date(timestamp).toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit'
+      });
+    }
+
+    // Auto-save timer
+    let autoSaveTimer = null;
+    let lastAutoSaveContent = '';
+
+    function scheduleAutoSave() {
+      if (autoSaveTimer) clearTimeout(autoSaveTimer);
+      
+      autoSaveTimer = setTimeout(() => {
+        if (state.currentFile && state.demoMode) {
+          const currentContent = editor.value;
+          const fileData = state.files.get(state.currentFile);
+          
+          // Only auto-save if content actually changed significantly
+          if (fileData && currentContent !== lastAutoSaveContent && currentContent.length > 10) {
+            // Check if last version is recent (within 5 minutes) and auto-save
+            const versions = getFileVersions(state.currentFile);
+            const lastVersion = versions[0];
+            const fiveMinutes = 5 * 60 * 1000;
+            
+            if (!lastVersion || Date.now() - lastVersion.timestamp > fiveMinutes) {
+              addVersion(state.currentFile, currentContent, 'Auto-save');
+              lastAutoSaveContent = currentContent;
+            }
+          }
+        }
+      }, 30000); // Auto-save after 30 seconds of inactivity
+    }
+
+    function saveToLocalStorage() {
+      if (!state.demoMode) return;
+      
+      const data = {};
+      state.files.forEach((fileData, name) => {
+        data[name] = {
+          content: fileData.content,
+          lastUpdated: fileData.lastUpdated
+        };
+      });
+      
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          files: data,
+          currentFile: state.currentFile,
+          sortBy: state.sortBy,
+          theme: state.theme
+        }));
+      } catch (e) {
+        console.warn('Failed to save to localStorage:', e);
+      }
+    }
+
+    function loadFromLocalStorage() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const data = JSON.parse(saved);
+          if (data.files && Object.keys(data.files).length > 0) {
+            return data;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load from localStorage:', e);
+      }
+      return null;
+    }
+
+    // ============================================
+    // File System Functions
+    // ============================================
+
+    async function openFolder() {
+      if (!hasFileSystemAccess) {
+        showToast('Your browser does not support local file access. Try Chrome or Edge.');
+        return;
+      }
+
+      try {
+        state.directoryHandle = await window.showDirectoryPicker({
+          mode: 'readwrite'
+        });
+        
+        document.getElementById('projectLabel').innerHTML = `<strong>${state.directoryHandle.name}</strong>`;
+        
+        // Show project UI
+        document.getElementById('noProjectState').style.display = 'none';
+        document.getElementById('sidebar').style.display = 'flex';
+        document.getElementById('sidebarResize').style.display = 'block';
+        document.getElementById('editorPanel').style.display = 'flex';
+        document.getElementById('editorResize').style.display = 'block';
+        document.getElementById('canvasPanel').style.display = 'block';
+        
+        state.demoMode = false;
+        await refreshFileTree();
+        updateGrid();
+        setupSortListeners();
+        
+        showToast(`Opened: ${state.directoryHandle.name}`);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error(err);
+          showToast('Failed to open folder');
+        }
+      }
+    }
+
+    async function refreshFileTree() {
+      if (!state.directoryHandle) return;
+      
+      state.files.clear();
+
+      for await (const entry of state.directoryHandle.values()) {
+        if (entry.kind === 'file' && entry.name.endsWith('.flow')) {
+          // Get file metadata for lastModified
+          const file = await entry.getFile();
+          state.files.set(entry.name, { 
+            handle: entry, 
+            content: null, 
+            modified: false,
+            lastUpdated: file.lastModified
+          });
+        }
+      }
+
+      // Get sorted files
+      const sortedFiles = getSortedFiles();
+
+      // Render file tree
+      if (sortedFiles.length === 0) {
+        fileTree.innerHTML = `
+          <div class="empty-state">
+            <p>No .flow files yet</p>
+            <button class="btn" onclick="showNewFileModal()">Create first file</button>
+          </div>
+        `;
+      } else {
+        fileTree.innerHTML = sortedFiles.map(name => {
+          const fileData = state.files.get(name);
+          const timeAgo = fileData?.lastUpdated ? getTimeAgo(fileData.lastUpdated) : '';
+          return `
+          <div class="file-item ${state.currentFile === name ? 'active' : ''} ${fileData?.modified ? 'modified' : ''}" data-file="${name}">
+            <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/>
+              <path d="M14 2v6h6"/>
+            </svg>
+            <span class="file-name">${name}</span>
+            ${state.sortBy === 'recent' && timeAgo && !fileData?.modified ? `<span class="file-time">${timeAgo}</span>` : ''}
+            <button class="file-delete-btn" data-delete="${name}" title="Delete file">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3,6 5,6 21,6"/>
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+              </svg>
+            </button>
+          </div>
+        `}).join('');
+
+        // Add click handlers
+        fileTree.querySelectorAll('.file-item').forEach(item => {
+          item.addEventListener('click', (e) => {
+            if (e.target.closest('.file-delete-btn')) return;
+            openFile(item.dataset.file);
+          });
+        });
+
+        fileTree.querySelectorAll('.file-delete-btn').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const filename = btn.dataset.delete;
+            showDeleteConfirmation(filename);
+          });
+        });
+
+        // Open first file if none selected
+        if (!state.currentFile && sortedFiles.length > 0) {
+          openFile(sortedFiles[0]);
+        }
+      }
+    }
+
+    async function openFile(filename) {
+      if (!state.files.has(filename)) return;
+      
+      // Save current file if modified
+      if (state.currentFile && state.files.get(state.currentFile)?.modified) {
+        await saveCurrentFile();
+      }
+
+      const fileData = state.files.get(filename);
+      
+      // Read content if not cached
+      if (fileData.content === null) {
+        try {
+          const file = await fileData.handle.getFile();
+          fileData.content = await file.text();
+        } catch (err) {
+          console.error(err);
+          showToast('Failed to read file');
+          return;
+        }
+      }
+
+      state.currentFile = filename;
+      editor.value = fileData.content;
+      document.getElementById('currentFileName').textContent = filename;
+      
+      // Update UI
+      fileTree.querySelectorAll('.file-item').forEach(item => {
+        item.classList.toggle('active', item.dataset.file === filename);
+      });
+
+      updateDiagram();
+      updateSaveStatus();
+    }
+
+    async function saveCurrentFile() {
+      if (!state.currentFile || !state.directoryHandle) return;
+
+      const fileData = state.files.get(state.currentFile);
+      if (!fileData) return;
+
+      try {
+        const writable = await fileData.handle.createWritable();
+        await writable.write(editor.value);
+        await writable.close();
+        
+        fileData.content = editor.value;
+        fileData.modified = false;
+        
+        updateSaveStatus();
+        showToast('Saved');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to save file');
+      }
+    }
+
+    async function createNewFile(filename) {
+      if (!state.directoryHandle) return;
+      
+      // Ensure .flow extension
+      if (!filename.endsWith('.flow')) {
+        filename += '.flow';
+      }
+
+      // Check if exists
+      if (state.files.has(filename)) {
+        showToast('File already exists');
+        return;
+      }
+
+      try {
+        const handle = await state.directoryHandle.getFileHandle(filename, { create: true });
+        
+        const defaultContent = `// ${filename.replace('.flow', '')}
+
+Start [shape: oval]
+Process
+End [shape: oval]
+
+Start > Process
+Process > End`;
+
+        const writable = await handle.createWritable();
+        await writable.write(defaultContent);
+        await writable.close();
+
+        state.files.set(filename, { handle, content: defaultContent, modified: false });
+        
+        await refreshFileTree();
+        openFile(filename);
+        
+        showToast('File created');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to create file');
+      }
+    }
+
+    async function deleteCurrentFile() {
+      if (!state.currentFile || !state.directoryHandle) return;
+
+      try {
+        await state.directoryHandle.removeEntry(state.currentFile);
+        state.files.delete(state.currentFile);
+        state.currentFile = null;
+        editor.value = '';
+        canvas.innerHTML = '';
+        
+        await refreshFileTree();
+        showToast('File deleted');
+      } catch (err) {
+        console.error(err);
+        showToast('Failed to delete file');
+      }
+    }
+
+    function showNewFileModal() {
+      document.getElementById('newFileInput').value = '';
+      document.getElementById('newFileModal').classList.add('active');
+      document.getElementById('newFileInput').focus();
+    }
+
+    function updateSaveStatus() {
+      const fileData = state.currentFile ? state.files.get(state.currentFile) : null;
+      
+      if (fileData?.modified) {
+        saveStatus.textContent = 'Modified';
+        statusDot.classList.add('modified');
+        statusDot.classList.remove('error');
+      } else {
+        saveStatus.textContent = 'Saved';
+        statusDot.classList.remove('modified', 'error');
+      }
+    }
+
+    // ============================================
+    // Parser (Eraser.io compatible syntax)
+    // ============================================
+
+    function parse(source) {
+      const nodes = new Map();
+      const edges = [];
+      const groups = [];
+      const groupNames = new Set();
+      let direction = 'down';
+      
+      // Tokenize with brace matching for groups
+      const tokens = tokenize(source);
+      
+      // Parse tokens
+      parseTokens(tokens, nodes, edges, groups, groupNames, null);
+      
+      // Extract direction from source
+      const dirMatch = source.match(/direction\s+(down|up|left|right)/i);
+      if (dirMatch) direction = dirMatch[1].toLowerCase();
+
+      return { nodes: Array.from(nodes.values()), edges, groups, groupNames, direction };
+    }
+
+    function tokenize(source) {
+      const lines = source.split('\n');
+      const tokens = [];
+      let i = 0;
+      
+      while (i < lines.length) {
+        const line = lines[i];
+        const trimmed = line.trim();
+        
+        // Skip empty lines and comments
+        if (!trimmed || trimmed.startsWith('//')) {
+          i++;
+          continue;
+        }
+        
+        // Skip direction/style directives
+        if (/^(direction|colorMode|styleMode|typeface)\s+/i.test(trimmed)) {
+          i++;
+          continue;
+        }
+        
+        // Check if this line starts a group (has { at end or followed by {)
+        if (trimmed.includes('{') && !trimmed.includes('>')) {
+          const result = parseGroupBlock(lines, i);
+          tokens.push(result.token);
+          i = result.nextIndex;
+          continue;
+        }
+        
+        // Connection line
+        if (trimmed.includes('>') || trimmed.includes('<') || trimmed.match(/\s-\s/) || trimmed.includes('--')) {
+          tokens.push({ type: 'connection', content: trimmed });
+          i++;
+          continue;
+        }
+        
+        // Node definition (possibly multiple comma-separated)
+        tokens.push({ type: 'nodes', content: trimmed });
+        i++;
+      }
+      
+      return tokens;
+    }
+
+    function parseGroupBlock(lines, startIndex) {
+      const firstLine = lines[startIndex].trim();
+      let braceCount = 0;
+      let content = [];
+      let i = startIndex;
+      
+      // Get group name and properties from first line
+      const headerMatch = firstLine.match(/^(.+?)\s*(\[.*?\])?\s*\{(.*)$/);
+      let groupName = headerMatch ? headerMatch[1].trim() : firstLine.replace(/\s*\{.*$/, '').trim();
+      let propsStr = headerMatch ? headerMatch[2] || '' : '';
+      let restOfLine = headerMatch ? headerMatch[3] || '' : '';
+      
+      // Handle quoted names
+      if (groupName.startsWith('"') && groupName.endsWith('"')) {
+        groupName = groupName.slice(1, -1);
+      }
+      
+      // Count braces in first line
+      for (const ch of firstLine) {
+        if (ch === '{') braceCount++;
+        if (ch === '}') braceCount--;
+      }
+      
+      // If there's content after { on same line
+      if (restOfLine.trim() && !restOfLine.trim().startsWith('}')) {
+        content.push(restOfLine.trim().replace(/\}$/, ''));
+      }
+      
+      i++;
+      
+      // Collect content until braces balance
+      while (i < lines.length && braceCount > 0) {
+        const line = lines[i].trim();
+        for (const ch of line) {
+          if (ch === '{') braceCount++;
+          if (ch === '}') braceCount--;
+        }
+        if (braceCount > 0) {
+          content.push(line);
+        } else {
+          // Last line, remove trailing }
+          const lastContent = line.replace(/\}$/, '').trim();
+          if (lastContent) content.push(lastContent);
+        }
+        i++;
+      }
+      
+      return {
+        token: {
+          type: 'group',
+          name: groupName,
+          props: propsStr,
+          content: content.join('\n')
+        },
+        nextIndex: i
+      };
+    }
+
+    function parseTokens(tokens, nodes, edges, groups, groupNames, parentGroup) {
+      for (const token of tokens) {
+        if (token.type === 'group') {
+          const props = parseProperties(token.props);
+          const group = {
+            name: token.name,
+            color: props.color ? (colorPalette[props.color] || props.color) : null,
+            icon: props.icon,
+            label: props.label || token.name,
+            children: []
+          };
+          groups.push(group);
+          groupNames.add(token.name);
+          
+          // Parse group content recursively
+          const innerTokens = tokenize(token.content);
+          parseTokens(innerTokens, nodes, edges, groups, groupNames, group);
+          
+        } else if (token.type === 'connection') {
+          parseConnection(token.content, nodes, edges, groupNames);
+          
+        } else if (token.type === 'nodes') {
+          // Could be comma-separated nodes
+          const nodeStrs = splitOutsideBrackets(token.content, ',');
+          for (const nodeStr of nodeStrs) {
+            const node = parseNode(nodeStr.trim());
+            if (node && !nodes.has(node.id)) {
+              if (parentGroup) {
+                node.group = parentGroup.name;
+                parentGroup.children.push(node.id);
+              }
+              nodes.set(node.id, node);
+            }
+          }
+        }
+      }
+    }
+
+    function parseProperties(propsStr) {
+      const props = {};
+      if (!propsStr) return props;
+      
+      // Remove brackets
+      const inner = propsStr.replace(/^\[|\]$/g, '').trim();
+      if (!inner) return props;
+      
+      // Split by comma, but respect quoted values
+      const parts = splitOutsideBrackets(inner, ',');
+      
+      for (const part of parts) {
+        const colonIdx = part.indexOf(':');
+        if (colonIdx > -1) {
+          const key = part.slice(0, colonIdx).trim().toLowerCase();
+          let value = part.slice(colonIdx + 1).trim();
+          // Remove quotes from value
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.slice(1, -1);
+          }
+          props[key] = value;
+        }
+      }
+      
+      return props;
+    }
+
+    function splitOutsideBrackets(str, delimiter) {
+      const result = [];
+      let current = '';
+      let depth = 0;
+      let inQuotes = false;
+      
+      for (let i = 0; i < str.length; i++) {
+        const ch = str[i];
+        
+        if (ch === '"' && str[i-1] !== '\\') {
+          inQuotes = !inQuotes;
+        }
+        
+        if (!inQuotes) {
+          if (ch === '[' || ch === '{') depth++;
+          if (ch === ']' || ch === '}') depth--;
+        }
+        
+        if (ch === delimiter && depth === 0 && !inQuotes) {
+          result.push(current.trim());
+          current = '';
+        } else {
+          current += ch;
+        }
+      }
+      
+      if (current.trim()) result.push(current.trim());
+      return result;
+    }
+
+    function parseNode(text) {
+      let remaining = text.trim();
+      if (!remaining) return null;
+      
+      // Extract properties [key: value, ...]
+      const propsMatch = remaining.match(/\[([^\]]+)\]/);
+      const props = propsMatch ? parseProperties(`[${propsMatch[1]}]`) : {};
+      remaining = remaining.replace(/\[[^\]]+\]/, '').trim();
+      
+      // Handle quoted names
+      let id = remaining;
+      if (id.startsWith('"') && id.endsWith('"')) {
+        id = id.slice(1, -1);
+      }
+      
+      if (!id) return null;
+      
+      // Map shape property to internal shape
+      const shape = props.shape ? props.shape.toLowerCase() : 'rectangle';
+      const shapeInfo = shapeMap[shape] || shapeMap.default;
+      
+      // Resolve color
+      let color = null;
+      if (props.color) {
+        color = colorPalette[props.color] || props.color;
+        // Handle hex in quotes
+        if (color.startsWith('"')) color = color.replace(/"/g, '');
+      }
+      
+      // Text mode: wrap (default), fit, clip
+      const textMode = props.text ? props.text.toLowerCase() : 'wrap';
+      
+      return {
+        id,
+        label: props.label || id,
+        shape: shapeInfo.shape,
+        shapeRadius: shapeInfo.radius,
+        color,
+        icon: props.icon,
+        text: textMode,
+        group: null
+      };
+    }
+
+    function parseConnection(text, nodes, edges, groupNames) {
+      // Handle different connector types: >, <, <>, -, --, -->
+      // First, extract any trailing properties [color: x]
+      let edgeProps = {};
+      const propsMatch = text.match(/\[([^\]]+)\]\s*$/);
+      if (propsMatch) {
+        edgeProps = parseProperties(`[${propsMatch[1]}]`);
+        text = text.replace(/\[[^\]]+\]\s*$/, '').trim();
+      }
+      
+      // Determine connector type and split
+      let connectorType = '>';
+      let parts = [];
+      
+      if (text.includes('<>')) {
+        connectorType = '<>';
+        parts = text.split('<>').map(p => p.trim());
+      } else if (text.includes('-->')) {
+        connectorType = '-->';
+        parts = text.split('-->').map(p => p.trim());
+      } else if (text.includes('--')) {
+        connectorType = '--';
+        parts = text.split('--').map(p => p.trim());
+      } else if (text.includes('<') && !text.includes('>')) {
+        connectorType = '<';
+        parts = text.split('<').map(p => p.trim());
+      } else if (text.includes('>')) {
+        connectorType = '>';
+        parts = text.split('>').map(p => p.trim());
+      } else if (text.match(/\s-\s/)) {
+        connectorType = '-';
+        parts = text.split(/\s-\s/).map(p => p.trim());
+      }
+      
+      if (parts.length < 2) return;
+      
+      // Process chained connections: A > B > C
+      for (let i = 0; i < parts.length - 1; i++) {
+        let sourcePart = parts[i];
+        let targetPart = parts[i + 1];
+        
+        // Source could have been created from previous iteration
+        // Handle branching: A > B, C, D (only on last part)
+        const targets = (i === parts.length - 2) ? splitOutsideBrackets(targetPart, ',') : [targetPart];
+        
+        for (let target of targets) {
+          let label = '';
+          
+          // Extract label after colon: A > B: label
+          const colonMatch = target.match(/^(.+?):\s*(.+)$/);
+          if (colonMatch) {
+            target = colonMatch[1].trim();
+            label = colonMatch[2].trim();
+            // Remove any trailing properties from label
+            label = label.replace(/\[[^\]]+\]$/, '').trim();
+          }
+          
+          // Clean source and target IDs
+          const sourceId = extractNodeId(sourcePart);
+          const targetId = extractNodeId(target);
+          
+          // Ensure nodes exist
+          const sourceIsGroup = groupNames.has(sourceId);
+          const targetIsGroup = groupNames.has(targetId);
+          
+          if (!sourceIsGroup && !nodes.has(sourceId)) {
+            const node = parseNode(sourcePart);
+            if (node) nodes.set(sourceId, node);
+          }
+          if (!targetIsGroup && !nodes.has(targetId)) {
+            const node = parseNode(target);
+            if (node) nodes.set(targetId, node);
+          }
+          
+          // Resolve edge color
+          let edgeColor = null;
+          if (edgeProps.color) {
+            edgeColor = colorPalette[edgeProps.color] || edgeProps.color;
+          }
+          
+          edges.push({
+            source: sourceId,
+            target: targetId,
+            label,
+            connectorType,
+            color: edgeColor,
+            sourceIsGroup,
+            targetIsGroup
+          });
+        }
+        
+        // For chained connections, use target as next source
+        sourcePart = targets[0];
+      }
+    }
+
+    function extractNodeId(text) {
+      // Remove properties and quotes
+      let id = text.replace(/\[[^\]]+\]/g, '').trim();
+      if (id.startsWith('"') && id.endsWith('"')) {
+        id = id.slice(1, -1);
+      }
+      return id;
+    }
+
+    // ============================================
+    // Layout
+    // ============================================
+
+    async function layout(parsed) {
+      const nodeToGroup = new Map();
+      const groupNameToIdx = new Map();
+
+      parsed.groups.forEach((g, idx) => {
+        groupNameToIdx.set(g.name, idx);
+        g.children.forEach(id => nodeToGroup.set(id, idx));
+      });
+
+      const autoNodes = parsed.nodes.filter(n => !n.position);
+      const ungrouped = autoNodes.filter(n => !nodeToGroup.has(n.id));
+
+      const elkChildren = ungrouped.map(n => createElkNode(n));
+
+      parsed.groups.forEach((group, idx) => {
+        const children = autoNodes.filter(n => nodeToGroup.get(n.id) === idx);
+        // Add group even if empty (for group-to-group connections)
+        elkChildren.push({
+          id: `__group_${idx}`,
+          layoutOptions: { 'elk.padding': '[top=35,left=15,bottom=15,right=15]' },
+          children: children.map(n => createElkNode(n)),
+          edges: parsed.edges
+            .filter(e => nodeToGroup.get(e.source) === idx && nodeToGroup.get(e.target) === idx && !e.sourceIsGroup && !e.targetIsGroup)
+            .map((e, i) => ({ id: `ge_${idx}_${i}`, sources: [e.source], targets: [e.target], labels: e.label ? [{ text: e.label, width: e.label.length * 7 + 10, height: 18 }] : [] }))
+        });
+      });
+
+      const elkEdges = [];
+      parsed.edges.forEach((e, i) => {
+        const sGroup = nodeToGroup.get(e.source);
+        const tGroup = nodeToGroup.get(e.target);
+        if (!e.sourceIsGroup && !e.targetIsGroup && sGroup !== undefined && tGroup !== undefined && sGroup === tGroup) return;
+
+        let sourceId = e.sourceIsGroup ? `__group_${groupNameToIdx.get(e.source)}` : e.source;
+        let targetId = e.targetIsGroup ? `__group_${groupNameToIdx.get(e.target)}` : e.target;
+
+        elkEdges.push({ id: `e_${i}`, sources: [sourceId], targets: [targetId], labels: e.label ? [{ text: e.label, width: e.label.length * 7 + 10, height: 18 }] : [] });
+      });
+
+      // Map direction to ELK direction
+      const directionMap = {
+        down: 'DOWN',
+        up: 'UP',
+        right: 'RIGHT',
+        left: 'LEFT'
+      };
+      const elkDirection = directionMap[parsed.direction] || 'DOWN';
+
+      const elkGraph = {
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': elkDirection,
+          'elk.spacing.nodeNode': '40',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '50',
+          'elk.edgeRouting': 'ORTHOGONAL',
+          'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
+          'elk.layered.layering.strategy': 'NETWORK_SIMPLEX',
+          'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP'
+        },
+        children: elkChildren,
+        edges: elkEdges
+      };
+
+      return await elk.layout(elkGraph);
+    }
+
+    // Text layout constants
+    const TEXT_CONFIG = {
+      fontSize: 12,
+      minFontSize: 8,
+      charWidth: 7,       // Approximate width per character at fontSize 12
+      lineHeight: 16,
+      padding: 12,
+      maxWidth: 200,      // Max width before wrapping
+      minWidth: 80
+    };
+
+    function wrapText(text, maxWidth) {
+      const words = text.split(' ');
+      const lines = [];
+      let currentLine = '';
+      
+      for (const word of words) {
+        const testLine = currentLine ? `${currentLine} ${word}` : word;
+        const testWidth = testLine.length * TEXT_CONFIG.charWidth;
+        
+        if (testWidth > maxWidth && currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
+        } else {
+          currentLine = testLine;
+        }
+      }
+      if (currentLine) lines.push(currentLine);
+      
+      return lines;
+    }
+
+    function createElkNode(node) {
+      const hasIcon = node.icon && icons[node.icon];
+      const iconSpace = hasIcon ? 24 : 0;
+      const textMode = node.text || 'wrap'; // wrap, fit, clip
+      
+      let width, height;
+      const label = node.label || node.id;
+      
+      if (textMode === 'clip' || textMode === 'fit') {
+        // Single line, fixed width
+        width = Math.min(TEXT_CONFIG.maxWidth, Math.max(TEXT_CONFIG.minWidth, label.length * TEXT_CONFIG.charWidth + TEXT_CONFIG.padding * 2 + iconSpace));
+        height = node.shape === 'diamond' ? 60 : 44;
+      } else {
+        // Wrap mode - calculate wrapped dimensions
+        const availableWidth = TEXT_CONFIG.maxWidth - TEXT_CONFIG.padding * 2 - iconSpace;
+        const lines = wrapText(label, availableWidth);
+        const textWidth = Math.max(...lines.map(l => l.length * TEXT_CONFIG.charWidth));
+        
+        width = Math.max(TEXT_CONFIG.minWidth, textWidth + TEXT_CONFIG.padding * 2 + iconSpace);
+        const textHeight = lines.length * TEXT_CONFIG.lineHeight;
+        height = node.shape === 'diamond' 
+          ? Math.max(60, textHeight + 30)
+          : Math.max(44, textHeight + TEXT_CONFIG.padding * 2);
+      }
+      
+      // Store calculated values for rendering
+      node._width = width;
+      node._height = height;
+      
+      return {
+        id: node.id,
+        width,
+        height
+      };
+    }
+
+    // ============================================
+    // Renderer
+    // ============================================
+
+    function render(elkResult, parsed) {
+      const nodeMap = new Map(parsed.nodes.map(n => [n.id, n]));
+      const groupMap = new Map(parsed.groups.map((g, i) => [`__group_${i}`, g]));
+
+      const positioned = [];
+      const groupRects = [];
+
+      function process(children, ox = 0, oy = 0) {
+        children.forEach(c => {
+          const x = (c.x || 0) + ox, y = (c.y || 0) + oy;
+          if (c.id.startsWith('__group_')) {
+            groupRects.push({ id: c.id, x, y, width: c.width, height: c.height, data: groupMap.get(c.id) });
+            if (c.children) process(c.children, x, y);
+          } else {
+            positioned.push({ id: c.id, x, y, width: c.width, height: c.height });
+          }
+        });
+      }
+      process(elkResult.children || []);
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      [...positioned, ...groupRects].forEach(n => {
+        minX = Math.min(minX, n.x);
+        minY = Math.min(minY, n.y);
+        maxX = Math.max(maxX, n.x + n.width);
+        maxY = Math.max(maxY, n.y + n.height);
+      });
+      if (!isFinite(minX)) { minX = 0; minY = 0; maxX = 400; maxY = 300; }
+
+      const pad = 50;
+      const width = maxX - minX + pad * 2;
+      const height = maxY - minY + pad * 2;
+      const ox = -minX + pad, oy = -minY + pad;
+
+      const style = getComputedStyle(document.body);
+      const nodeFill = style.getPropertyValue('--node-fill').trim();
+      const nodeStroke = style.getPropertyValue('--node-stroke').trim();
+      const nodeText = style.getPropertyValue('--node-text').trim();
+      const edgeStroke = style.getPropertyValue('--edge-stroke').trim();
+      const textDim = style.getPropertyValue('--text-dim').trim();
+      const groupFill = style.getPropertyValue('--group-fill').trim();
+      const groupStroke = style.getPropertyValue('--group-stroke').trim();
+
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
+      svg += `<defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${edgeStroke}"/></marker></defs>`;
+
+      // Groups
+      groupRects.forEach(g => {
+        const x = g.x + ox, y = g.y + oy;
+        const fill = g.data?.color ? hexToRgba(g.data.color, 0.12) : groupFill;
+        const stroke = g.data?.color || groupStroke;
+        svg += `<rect x="${x}" y="${y}" width="${g.width}" height="${g.height}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="4 2"/>`;
+        svg += `<text x="${x + 10}" y="${y + 18}" fill="${g.data?.color || textDim}" font-size="11" font-weight="600" font-family="DM Sans,sans-serif">${esc(g.data?.name || '')}</text>`;
+      });
+
+      // Edges
+      const posMap = new Map(positioned.map(p => [p.id, { x: p.x + ox, y: p.y + oy, w: p.width, h: p.height }]));
+
+      function drawEdges(edges, bx = 0, by = 0) {
+        (edges || []).forEach(e => {
+          if (e.sections) {
+            e.sections.forEach(s => {
+              let d = `M ${s.startPoint.x + ox + bx} ${s.startPoint.y + oy + by}`;
+              (s.bendPoints || []).forEach(b => d += ` L ${b.x + ox + bx} ${b.y + oy + by}`);
+              d += ` L ${s.endPoint.x + ox + bx} ${s.endPoint.y + oy + by}`;
+              svg += `<path d="${d}" fill="none" stroke="${edgeStroke}" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+            });
+            (e.labels || []).forEach(l => {
+              if (l.x !== undefined) {
+                const lx = l.x + ox + bx, ly = l.y + oy + by;
+                svg += `<rect x="${lx - 2}" y="${ly - 1}" width="${l.width + 4}" height="${l.height + 2}" fill="${nodeFill}" rx="2"/>`;
+                svg += `<text x="${lx + l.width / 2}" y="${ly + 12}" text-anchor="middle" fill="${textDim}" font-size="10" font-family="DM Sans,sans-serif">${esc(l.text)}</text>`;
+              }
+            });
+          }
+        });
+      }
+      drawEdges(elkResult.edges);
+      (elkResult.children || []).forEach(c => { if (c.id.startsWith('__group_') && c.edges) drawEdges(c.edges, c.x || 0, c.y || 0); });
+
+      // Nodes
+      positioned.forEach(p => {
+        const node = nodeMap.get(p.id);
+        if (!node) return;
+        const x = p.x + ox, y = p.y + oy, w = p.width, h = p.height;
+        const fill = node.color || nodeFill;
+        const hasIcon = node.icon && icons[node.icon];
+        const textMode = node.text || 'wrap';
+        const label = node.label || node.id;
+
+        svg += renderShape(node.shape, x, y, w, h, fill, nodeStroke);
+
+        // Icon
+        if (hasIcon) {
+          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${nodeText}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[node.icon]}"/></svg></g>`;
+        }
+
+        // Text rendering based on mode
+        const iconSpace = hasIcon ? 24 : 0;
+        const textX = hasIcon ? x + 30 : x + TEXT_CONFIG.padding;
+        const availableWidth = w - TEXT_CONFIG.padding * 2 - iconSpace;
+        const centerX = hasIcon ? x + 30 + (w - 30) / 2 : x + w / 2;
+
+        if (textMode === 'fit') {
+          // Fit mode: shrink font to fit in single line
+          const textWidth = label.length * TEXT_CONFIG.charWidth;
+          let fontSize = TEXT_CONFIG.fontSize;
+          if (textWidth > availableWidth) {
+            fontSize = Math.max(TEXT_CONFIG.minFontSize, Math.floor(TEXT_CONFIG.fontSize * availableWidth / textWidth));
+          }
+          svg += `<text x="${centerX}" y="${y + h / 2 + fontSize / 3}" text-anchor="middle" fill="${nodeText}" font-size="${fontSize}" font-family="DM Sans,sans-serif" font-weight="500">${esc(label)}</text>`;
+          
+        } else if (textMode === 'clip') {
+          // Clip mode: truncate with ellipsis, show full text on hover
+          const maxChars = Math.floor(availableWidth / TEXT_CONFIG.charWidth);
+          const displayText = label.length > maxChars ? label.slice(0, maxChars - 1) + '…' : label;
+          const clipId = `clip_${p.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
+          
+          svg += `<defs><clipPath id="${clipId}"><rect x="${textX}" y="${y}" width="${availableWidth}" height="${h}"/></clipPath></defs>`;
+          svg += `<text x="${centerX}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${nodeText}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500" clip-path="url(#${clipId})">`;
+          svg += `${esc(displayText)}<title>${esc(label)}</title></text>`;
+          
+        } else {
+          // Wrap mode (default): wrap text into multiple lines
+          const lines = wrapText(label, availableWidth);
+          const lineHeight = TEXT_CONFIG.lineHeight;
+          const totalTextHeight = lines.length * lineHeight;
+          const startY = y + (h - totalTextHeight) / 2 + lineHeight * 0.7;
+          
+          lines.forEach((line, i) => {
+            svg += `<text x="${centerX}" y="${startY + i * lineHeight}" text-anchor="middle" fill="${nodeText}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500">${esc(line)}</text>`;
+          });
+        }
+      });
+
+      svg += '</svg>';
+      return { svg, width, height };
+    }
+
+    function renderShape(shape, x, y, w, h, fill, stroke) {
+      switch (shape) {
+        case 'diamond':
+          const cx = x + w / 2, cy = y + h / 2;
+          return `<polygon points="${cx},${y} ${x + w},${cy} ${cx},${y + h} ${x},${cy}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'stadium': // oval
+        case 'ellipse':
+          return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${h / 2}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'parallelogram':
+          const s = 10;
+          return `<polygon points="${x + s},${y} ${x + w},${y} ${x + w - s},${y + h} ${x},${y + h}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'cylinder':
+          const r = 6;
+          return `<path d="M${x} ${y + r} C${x} ${y},${x + w} ${y},${x + w} ${y + r} L${x + w} ${y + h - r} C${x + w} ${y + h},${x} ${y + h},${x} ${y + h - r} Z M${x} ${y + r} C${x} ${y + r * 2},${x + w} ${y + r * 2},${x + w} ${y + r}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'document':
+          return `<path d="M${x} ${y} L${x + w} ${y} L${x + w} ${y + h - 8} Q${x + w * 0.75} ${y + h - 4} ${x + w / 2} ${y + h - 8} Q${x + w * 0.25} ${y + h - 12} ${x} ${y + h - 8} Z" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'hexagon':
+          const hx = 12;
+          return `<polygon points="${x + hx},${y} ${x + w - hx},${y} ${x + w},${y + h/2} ${x + w - hx},${y + h} ${x + hx},${y + h} ${x},${y + h/2}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'trapezoid':
+          const tx = 12;
+          return `<polygon points="${x + tx},${y} ${x + w - tx},${y} ${x + w},${y + h} ${x},${y + h}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'triangle':
+          return `<polygon points="${x + w/2},${y} ${x + w},${y + h} ${x},${y + h}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'star':
+          const starPoints = [];
+          for (let i = 0; i < 10; i++) {
+            const angle = (i * 36 - 90) * Math.PI / 180;
+            const radius = i % 2 === 0 ? Math.min(w, h) / 2 : Math.min(w, h) / 4;
+            starPoints.push(`${x + w/2 + radius * Math.cos(angle)},${y + h/2 + radius * Math.sin(angle)}`);
+          }
+          return `<polygon points="${starPoints.join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+        case 'rect':
+        default:
+          return `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`;
+      }
+    }
+
+    function hexToRgba(hex, a) {
+      if (!hex.startsWith('#')) return hex;
+      const r = parseInt(hex.slice(1, 3), 16), g = parseInt(hex.slice(3, 5), 16), b = parseInt(hex.slice(5, 7), 16);
+      return `rgba(${r},${g},${b},${a})`;
+    }
+
+    function esc(t) {
+      return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // ============================================
+    // Update Diagram
+    // ============================================
+
+    let updateTimer;
+    async function updateDiagram() {
+      const source = editor.value;
+
+      try {
+        const parsed = parse(source);
+        if (parsed.nodes.length === 0) {
+          canvas.innerHTML = '';
+          setStatus('Ready', false);
+          return;
+        }
+
+        const elkResult = await layout(parsed);
+        const { svg, width, height } = render(elkResult, parsed);
+
+        canvas.innerHTML = svg;
+        canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+        setStatus(`${parsed.nodes.length} nodes`, false);
+      } catch (err) {
+        console.error(err);
+        setStatus('Error', true);
+      }
+    }
+
+    function setStatus(text, isError) {
+      statusText.textContent = text;
+      statusDot.classList.toggle('error', isError);
+    }
+
+    function scheduleUpdate() {
+      clearTimeout(updateTimer);
+      updateTimer = setTimeout(updateDiagram, 150);
+    }
+
+    // ============================================
+    // Editor Events
+    // ============================================
+
+    editor.addEventListener('input', () => {
+      if (state.currentFile) {
+        const fileData = state.files.get(state.currentFile);
+        if (fileData) {
+          fileData.modified = fileData.content !== editor.value;
+          fileData.content = editor.value; // Update content immediately
+          fileData.lastUpdated = Date.now();
+          updateSaveStatus();
+          saveToLocalStorage(); // Auto-save to localStorage
+          scheduleAutoSave(); // Schedule version auto-save
+        }
+      }
+      scheduleUpdate();
+    });
+
+    // ============================================
+    // Zoom & Pan
+    // ============================================
+
+    let isPanning = false, startPan = { x: 0, y: 0 };
+
+    canvasContainer.addEventListener('mousedown', e => {
+      if (e.button === 0) {
+        isPanning = true;
+        startPan = { x: e.clientX - state.pan.x, y: e.clientY - state.pan.y };
+      }
+    });
+
+    document.addEventListener('mousemove', e => {
+      if (isPanning) {
+        state.pan.x = e.clientX - startPan.x;
+        state.pan.y = e.clientY - startPan.y;
+        applyTransform();
+      }
+    });
+
+    document.addEventListener('mouseup', () => isPanning = false);
+
+    canvasContainer.addEventListener('wheel', e => {
+      e.preventDefault();
+      state.zoom = Math.max(0.1, Math.min(4, state.zoom * (e.deltaY > 0 ? 0.9 : 1.1)));
+      applyTransform();
+    });
+
+    function applyTransform() {
+      canvas.style.transform = `translate(${state.pan.x}px,${state.pan.y}px) scale(${state.zoom})`;
+      canvas.style.transformOrigin = '0 0';
+      zoomDisplay.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+
+    document.getElementById('zoomInBtn').addEventListener('click', () => { state.zoom = Math.min(4, state.zoom * 1.2); applyTransform(); });
+    document.getElementById('zoomOutBtn').addEventListener('click', () => { state.zoom = Math.max(0.1, state.zoom / 1.2); applyTransform(); });
+    document.getElementById('fitBtn').addEventListener('click', () => { state.zoom = 1; state.pan = { x: 0, y: 0 }; applyTransform(); });
+
+    // ============================================
+    // Export
+    // ============================================
+
+    document.getElementById('exportSvgBtn').addEventListener('click', () => {
+      const svgContent = canvas.innerHTML;
+      if (!svgContent) return;
+      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+      download(blob, (state.currentFile || 'diagram').replace('.flow', '.svg'));
+    });
+
+    document.getElementById('exportPngBtn').addEventListener('click', () => {
+      const svgContent = canvas.innerHTML;
+      if (!svgContent) return;
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement('canvas');
+        c.width = img.width * 2; c.height = img.height * 2;
+        const ctx = c.getContext('2d');
+        ctx.scale(2, 2);
+        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-canvas').trim();
+        ctx.fillRect(0, 0, img.width, img.height);
+        ctx.drawImage(img, 0, 0);
+        c.toBlob(blob => download(blob, (state.currentFile || 'diagram').replace('.flow', '.png')), 'image/png');
+      };
+      img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgContent)));
+    });
+
+    function download(blob, name) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    // ============================================
+    // UI Events
+    // ============================================
+
+    document.getElementById('openFolderBtn').addEventListener('click', openFolder);
+    document.getElementById('openFolderHeaderBtn').addEventListener('click', openFolder);
+    document.getElementById('openFolderSidebarBtn').addEventListener('click', openFolder);
+    document.getElementById('newFileBtn').addEventListener('click', showNewFileModal);
+    document.getElementById('createFirstBtn')?.addEventListener('click', showNewFileModal);
+    document.getElementById('refreshBtn').addEventListener('click', refreshFileTree);
+    document.getElementById('helpBtn').addEventListener('click', () => document.getElementById('helpModal').classList.add('active'));
+
+    document.getElementById('themeBtn').addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.body.setAttribute('data-theme', state.theme);
+      updateGrid();
+      updateDiagram();
+      if (state.demoMode) saveToLocalStorage();
+    });
+
+    document.getElementById('confirmDeleteBtn').addEventListener('click', async () => {
+      const modal = document.getElementById('deleteModal');
+      const filename = modal.dataset.filename || state.currentFile;
+      modal.classList.remove('active');
+      await deleteFile(filename);
+    });
+
+    async function deleteFile(filename) {
+      if (!filename) return;
+      
+      if (state.demoMode) {
+        state.files.delete(filename);
+        // Also delete versions for this file
+        delete fileVersions[filename];
+        saveVersions();
+        
+        if (state.currentFile === filename) {
+          state.currentFile = null;
+          editor.value = '';
+          canvas.innerHTML = '';
+          document.getElementById('currentFileName').textContent = 'untitled.flow';
+        }
+        renderDemoFileTree();
+        saveToLocalStorage();
+        showToast('File deleted');
+      } else {
+        // Real file system mode
+        if (state.directoryHandle) {
+          try {
+            await state.directoryHandle.removeEntry(filename);
+            state.files.delete(filename);
+            if (state.currentFile === filename) {
+              state.currentFile = null;
+              editor.value = '';
+              canvas.innerHTML = '';
+            }
+            await refreshFileTree();
+            showToast('File deleted');
+          } catch (err) {
+            console.error(err);
+            showToast('Failed to delete file');
+          }
+        }
+      }
+    }
+
+    document.getElementById('confirmNewFileBtn').addEventListener('click', async () => {
+      const name = document.getElementById('newFileInput').value.trim();
+      if (name) {
+        document.getElementById('newFileModal').classList.remove('active');
+        await createNewFile(name);
+      }
+    });
+
+    document.getElementById('newFileInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('confirmNewFileBtn').click();
+    });
+
+    // ============================================
+    // Version History UI
+    // ============================================
+
+    let compareState = { leftVersion: null, rightVersion: null };
+
+    document.getElementById('versionsBtn').addEventListener('click', () => {
+      if (!state.currentFile) {
+        showToast('No file selected');
+        return;
+      }
+      showVersionHistory();
+    });
+
+    document.getElementById('saveNewVersionBtn').addEventListener('click', () => {
+      document.getElementById('versionHistoryModal').classList.remove('active');
+      showSaveVersionModal();
+    });
+
+    document.getElementById('confirmSaveVersionBtn').addEventListener('click', () => {
+      const comment = document.getElementById('versionCommentInput').value.trim();
+      if (state.currentFile) {
+        const content = editor.value;
+        addVersion(state.currentFile, content, comment || 'Manual save');
+        lastAutoSaveContent = content;
+        showToast('Version saved');
+      }
+      document.getElementById('saveVersionModal').classList.remove('active');
+      document.getElementById('versionCommentInput').value = '';
+    });
+
+    document.getElementById('versionCommentInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('confirmSaveVersionBtn').click();
+    });
+
+    document.getElementById('restoreVersionBtn').addEventListener('click', () => {
+      if (compareState.leftVersion && state.currentFile) {
+        editor.value = compareState.leftVersion.content;
+        const fileData = state.files.get(state.currentFile);
+        if (fileData) {
+          fileData.content = compareState.leftVersion.content;
+          fileData.modified = true;
+          fileData.lastUpdated = Date.now();
+        }
+        scheduleUpdate();
+        saveToLocalStorage();
+        document.getElementById('versionCompareModal').classList.remove('active');
+        showToast('Version restored');
+      }
+    });
+
+    function showSaveVersionModal() {
+      document.getElementById('versionCommentInput').value = '';
+      document.getElementById('saveVersionModal').classList.add('active');
+      setTimeout(() => document.getElementById('versionCommentInput').focus(), 100);
+    }
+
+    function showVersionHistory() {
+      const versions = getFileVersions(state.currentFile);
+      const currentContent = editor.value;
+      const versionList = document.getElementById('versionList');
+      
+      if (versions.length === 0) {
+        versionList.innerHTML = `
+          <div class="empty-state">
+            <p>No saved versions yet</p>
+            <p style="font-size: 11px; color: var(--text-muted);">
+              Versions are auto-saved every 5 minutes when you make changes.<br>
+              Click "Save Current" to save a named version.
+            </p>
+          </div>
+        `;
+      } else {
+        versionList.innerHTML = versions.map((v, i) => {
+          const isCurrent = v.content === currentContent;
+          return `
+            <div class="version-item ${isCurrent ? 'current' : ''}" data-id="${v.id}">
+              <div class="version-header">
+                <span class="version-comment">
+                  ${escapeHtml(v.comment)}
+                  ${isCurrent ? '<span class="version-current-badge">Current</span>' : ''}
+                </span>
+                <span class="version-time">${formatVersionTime(v.timestamp)}</span>
+              </div>
+              <div class="version-meta">${formatFullTime(v.timestamp)}</div>
+              <div class="version-actions">
+                <button class="btn" onclick="previewVersion('${v.id}')">Preview</button>
+                <button class="btn" onclick="compareWithCurrent('${v.id}')">Compare</button>
+                ${!isCurrent ? `<button class="btn" onclick="restoreVersion('${v.id}')">Restore</button>` : ''}
+                ${i > 0 ? `<button class="btn" onclick="compareVersions('${v.id}', '${versions[i-1].id}')">vs Previous</button>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+      
+      document.getElementById('versionHistoryModal').classList.add('active');
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function previewVersion(versionId) {
+      const versions = getFileVersions(state.currentFile);
+      const version = versions.find(v => v.id === versionId);
+      if (!version) return;
+      
+      compareState.leftVersion = version;
+      compareState.rightVersion = { content: editor.value, comment: 'Current', timestamp: Date.now() };
+      
+      document.getElementById('compareLeftLabel').textContent = version.comment + ' (' + formatVersionTime(version.timestamp) + ')';
+      document.getElementById('compareRightLabel').textContent = 'Current';
+      
+      document.getElementById('compareLeft').textContent = version.content;
+      document.getElementById('compareRight').textContent = editor.value;
+      
+      document.getElementById('restoreVersionBtn').style.display = 'inline-block';
+      document.getElementById('versionHistoryModal').classList.remove('active');
+      document.getElementById('versionCompareModal').classList.add('active');
+    }
+
+    function compareWithCurrent(versionId) {
+      previewVersion(versionId);
+    }
+
+    function compareVersions(leftId, rightId) {
+      const versions = getFileVersions(state.currentFile);
+      const leftVersion = versions.find(v => v.id === leftId);
+      const rightVersion = versions.find(v => v.id === rightId);
+      if (!leftVersion || !rightVersion) return;
+      
+      compareState.leftVersion = leftVersion;
+      compareState.rightVersion = rightVersion;
+      
+      document.getElementById('compareLeftLabel').textContent = leftVersion.comment + ' (' + formatVersionTime(leftVersion.timestamp) + ')';
+      document.getElementById('compareRightLabel').textContent = rightVersion.comment + ' (' + formatVersionTime(rightVersion.timestamp) + ')';
+      
+      // Simple diff highlighting
+      document.getElementById('compareLeft').innerHTML = highlightDiff(leftVersion.content, rightVersion.content, 'left');
+      document.getElementById('compareRight').innerHTML = highlightDiff(rightVersion.content, leftVersion.content, 'right');
+      
+      document.getElementById('restoreVersionBtn').style.display = 'inline-block';
+      document.getElementById('versionHistoryModal').classList.remove('active');
+      document.getElementById('versionCompareModal').classList.add('active');
+    }
+
+    function restoreVersion(versionId) {
+      const versions = getFileVersions(state.currentFile);
+      const version = versions.find(v => v.id === versionId);
+      if (!version) return;
+      
+      editor.value = version.content;
+      const fileData = state.files.get(state.currentFile);
+      if (fileData) {
+        fileData.content = version.content;
+        fileData.modified = true;
+        fileData.lastUpdated = Date.now();
+      }
+      scheduleUpdate();
+      saveToLocalStorage();
+      document.getElementById('versionHistoryModal').classList.remove('active');
+      showToast('Version restored');
+    }
+
+    function highlightDiff(text1, text2, side) {
+      const lines1 = text1.split('\n');
+      const lines2 = text2.split('\n');
+      const result = [];
+      
+      const set2 = new Set(lines2);
+      
+      for (const line of lines1) {
+        const escaped = escapeHtml(line);
+        if (!set2.has(line) && line.trim()) {
+          result.push(`<span class="diff-line ${side === 'left' ? 'diff-remove' : 'diff-add'}">${escaped || ' '}</span>`);
+        } else {
+          result.push(escaped || ' ');
+        }
+      }
+      
+      return result.join('\n');
+    }
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(m => {
+      m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); });
+    });
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', e => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+        e.preventDefault();
+        // Ctrl+S now prompts for version comment
+        if (state.currentFile) {
+          showSaveVersionModal();
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'n') {
+        e.preventDefault();
+        showNewFileModal();
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 'o') {
+        e.preventDefault();
+        openFolder();
+      }
+    });
+
+    // ============================================
+    // Grid & Utils
+    // ============================================
+
+    function updateGrid() {
+      const grid = document.getElementById('gridPattern');
+      const color = getComputedStyle(document.body).getPropertyValue('--border').trim();
+      grid.innerHTML = `<defs><pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse"><circle cx="10" cy="10" r="0.5" fill="${color}"/></pattern></defs><rect width="100%" height="100%" fill="url(#grid)"/>`;
+    }
+
+    function showToast(msg) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 2500);
+    }
+
+    // ============================================
+    // Sample Project Data
+    // ============================================
+
+    const sampleFiles = {
+      'welcome.flow': `// Welcome to FlowScript!
+// Eraser.io compatible syntax
+
+Start [shape: oval, icon: globe]
+Read Guide [icon: code]
+Try Examples [icon: check]
+Create Own [shape: oval, color: green, icon: user]
+
+Start > Read Guide
+Read Guide > Try Examples
+Try Examples > Create Own
+
+// Syntax:
+// [shape: oval/diamond/cylinder/parallelogram]
+// [color: red/green/blue/yellow/purple/orange]
+// [icon: globe/user/check/code/database/server]
+// [text: wrap/fit/clip]`,
+
+      'login-flow.flow': `// User Login Flow
+
+Start [shape: oval, icon: globe]
+Login Page [shape: parallelogram, icon: user]
+Enter Credentials
+Validate [shape: diamond]
+Invalid [color: red, icon: x]
+Check 2FA [shape: diamond]
+Enter Code [shape: parallelogram]
+Verify Code [shape: diamond]
+Success [shape: oval, color: green, icon: check]
+
+Start > Login Page
+Login Page > Enter Credentials
+Enter Credentials > Validate
+
+Validate > Invalid: no
+Validate > Check 2FA: yes
+Invalid > Login Page
+
+Check 2FA > Enter Code: enabled
+Check 2FA > Success: disabled
+Enter Code > Verify Code
+
+Verify Code > Invalid: no
+Verify Code > Success: yes`,
+
+      'api-architecture.flow': `// API Architecture
+
+Frontend [color: purple] {
+  React App [icon: code]
+  Redux Store [icon: cache]
+}
+
+Backend [color: blue] {
+  API Gateway [icon: api]
+  Auth Service [icon: lock]
+  User Service [icon: user]
+  Database [shape: cylinder, icon: database]
+}
+
+Cloud [color: orange] {
+  Lambda [icon: server]
+  S3 Storage [icon: database]
+  CDN [icon: globe]
+}
+
+Frontend > Backend: REST API
+Backend > Cloud: async jobs
+Cloud > Frontend: static assets`,
+
+      'order-process.flow': `// E-Commerce Order Process
+
+Start [shape: oval, icon: globe]
+Receive Order [shape: parallelogram, icon: mail]
+Check Inventory [shape: diamond]
+Out of Stock [color: yellow, icon: alert]
+Notify Customer [icon: mail]
+Process Payment [shape: diamond]
+Payment Failed [color: red, icon: x]
+Retry Payment [shape: diamond]
+Cancel Order [color: red, icon: x]
+Prepare Shipment [icon: server]
+Ship Order [icon: globe]
+Complete [shape: oval, color: green, icon: check]
+
+Start > Receive Order
+Receive Order > Check Inventory
+
+Check Inventory > Out of Stock: no
+Check Inventory > Process Payment: yes
+Out of Stock > Notify Customer
+Notify Customer > Cancel Order
+
+Process Payment > Payment Failed: failed
+Process Payment > Prepare Shipment: success
+Payment Failed > Retry Payment
+
+Retry Payment > Process Payment: yes
+Retry Payment > Cancel Order: no
+
+Prepare Shipment > Ship Order
+Ship Order > Complete`
+    };
+
+    // ============================================
+    // Demo Mode (In-Memory)
+    // ============================================
+
+    function loadSampleProject() {
+      // Set up in-memory demo mode
+      state.directoryHandle = null;
+      state.demoMode = true;
+      
+      // Try to load from localStorage first
+      const saved = loadFromLocalStorage();
+      
+      if (saved) {
+        // Restore saved state
+        Object.entries(saved.files).forEach(([name, fileData]) => {
+          state.files.set(name, { 
+            handle: null, 
+            content: fileData.content, 
+            modified: false,
+            lastUpdated: fileData.lastUpdated
+          });
+        });
+        
+        if (saved.sortBy) state.sortBy = saved.sortBy;
+        if (saved.theme) {
+          state.theme = saved.theme;
+          document.body.setAttribute('data-theme', state.theme);
+        }
+        
+        // Update UI
+        document.getElementById('projectLabel').innerHTML = '<strong>Local Project</strong> <span style="color: var(--text-muted); font-size: 11px;">(browser)</span>';
+        
+        // Show project UI
+        document.getElementById('noProjectState').style.display = 'none';
+        document.getElementById('sidebar').style.display = 'flex';
+        document.getElementById('sidebarResize').style.display = 'block';
+        document.getElementById('editorPanel').style.display = 'flex';
+        document.getElementById('editorResize').style.display = 'block';
+        document.getElementById('canvasPanel').style.display = 'block';
+
+        renderDemoFileTree();
+        
+        // Restore current file or open first
+        const fileToOpen = saved.currentFile && state.files.has(saved.currentFile) 
+          ? saved.currentFile 
+          : getSortedFiles()[0];
+        if (fileToOpen) openDemoFile(fileToOpen);
+        
+        updateGrid();
+        setupSortListeners();
+        updateSortButtonState();
+        return;
+      }
+      
+      // No saved data - load sample files with different timestamps
+      const now = Date.now();
+      const fileList = Object.entries(sampleFiles);
+      fileList.forEach(([name, content], idx) => {
+        state.files.set(name, { 
+          handle: null, 
+          content, 
+          modified: false,
+          lastUpdated: now - (idx * 3600000)
+        });
+      });
+
+      // Update UI
+      document.getElementById('projectLabel').innerHTML = '<strong>Sample Project</strong> <span style="color: var(--text-muted); font-size: 11px;">(demo)</span>';
+      
+      // Show project UI
+      document.getElementById('noProjectState').style.display = 'none';
+      document.getElementById('sidebar').style.display = 'flex';
+      document.getElementById('sidebarResize').style.display = 'block';
+      document.getElementById('editorPanel').style.display = 'flex';
+      document.getElementById('editorResize').style.display = 'block';
+      document.getElementById('canvasPanel').style.display = 'block';
+
+      renderDemoFileTree();
+      openDemoFile('welcome.flow');
+      updateGrid();
+      setupSortListeners();
+      
+      // Save initial state
+      saveToLocalStorage();
+    }
+    
+    function updateSortButtonState() {
+      const sortNameBtn = document.getElementById('sortNameBtn');
+      const sortRecentBtn = document.getElementById('sortRecentBtn');
+      if (state.sortBy === 'recent') {
+        sortRecentBtn.classList.add('active');
+        sortNameBtn.classList.remove('active');
+      } else {
+        sortNameBtn.classList.add('active');
+        sortRecentBtn.classList.remove('active');
+      }
+    }
+
+    function getSortedFiles() {
+      const files = Array.from(state.files.entries());
+      
+      if (state.sortBy === 'recent') {
+        // Sort by lastUpdated descending (most recent first)
+        files.sort((a, b) => (b[1].lastUpdated || 0) - (a[1].lastUpdated || 0));
+      } else {
+        // Sort by name ascending
+        files.sort((a, b) => a[0].localeCompare(b[0]));
+      }
+      
+      return files.map(([name]) => name);
+    }
+
+    function renderDemoFileTree() {
+      const files = getSortedFiles();
+      
+      if (files.length === 0) {
+        fileTree.innerHTML = `
+          <div class="empty-state">
+            <p>No .flow files yet</p>
+            <button class="btn" onclick="showNewFileModal()">Create first file</button>
+          </div>
+        `;
+        return;
+      }
+      
+      fileTree.innerHTML = files.map(name => {
+        const fileData = state.files.get(name);
+        const timeAgo = fileData?.lastUpdated ? getTimeAgo(fileData.lastUpdated) : '';
+        return `
+        <div class="file-item ${state.currentFile === name ? 'active' : ''} ${fileData?.modified ? 'modified' : ''}" data-file="${name}">
+          <svg class="file-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8l-6-6z"/>
+            <path d="M14 2v6h6"/>
+          </svg>
+          <span class="file-name">${name}</span>
+          ${state.sortBy === 'recent' && timeAgo && !fileData?.modified ? `<span class="file-time">${timeAgo}</span>` : ''}
+          <button class="file-delete-btn" data-delete="${name}" title="Delete file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3,6 5,6 21,6"/>
+              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+        </div>
+      `}).join('');
+
+      fileTree.querySelectorAll('.file-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+          // Don't open file if clicking delete button
+          if (e.target.closest('.file-delete-btn')) return;
+          openDemoFile(item.dataset.file);
+        });
+      });
+
+      fileTree.querySelectorAll('.file-delete-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const filename = btn.dataset.delete;
+          showDeleteConfirmation(filename);
+        });
+      });
+    }
+
+    function showDeleteConfirmation(filename) {
+      document.getElementById('deleteFileName').textContent = filename;
+      document.getElementById('deleteModal').dataset.filename = filename;
+      document.getElementById('deleteModal').classList.add('active');
+    }
+
+    function getTimeAgo(timestamp) {
+      const seconds = Math.floor((Date.now() - timestamp) / 1000);
+      if (seconds < 60) return 'now';
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h`;
+      const days = Math.floor(hours / 24);
+      return `${days}d`;
+    }
+
+    function setupSortListeners() {
+      const sortNameBtn = document.getElementById('sortNameBtn');
+      const sortRecentBtn = document.getElementById('sortRecentBtn');
+      
+      sortNameBtn.addEventListener('click', () => {
+        state.sortBy = 'name';
+        sortNameBtn.classList.add('active');
+        sortRecentBtn.classList.remove('active');
+        if (state.demoMode) {
+          renderDemoFileTree();
+          saveToLocalStorage();
+        } else {
+          refreshFileTree();
+        }
+      });
+      
+      sortRecentBtn.addEventListener('click', () => {
+        state.sortBy = 'recent';
+        sortRecentBtn.classList.add('active');
+        sortNameBtn.classList.remove('active');
+        if (state.demoMode) {
+          renderDemoFileTree();
+          saveToLocalStorage();
+        } else {
+          refreshFileTree();
+        }
+      });
+    }
+
+    function openDemoFile(filename) {
+      const fileData = state.files.get(filename);
+      if (!fileData) return;
+
+      state.currentFile = filename;
+      editor.value = fileData.content;
+      document.getElementById('currentFileName').textContent = filename;
+
+      renderDemoFileTree();
+      updateDiagram();
+      updateSaveStatus();
+      saveToLocalStorage();
+    }
+
+    // Override save for demo mode
+    const originalSaveCurrentFile = saveCurrentFile;
+    saveCurrentFile = async function() {
+      if (state.demoMode) {
+        // In demo mode, save to memory and localStorage
+        const fileData = state.files.get(state.currentFile);
+        if (fileData) {
+          fileData.content = editor.value;
+          fileData.modified = false;
+          fileData.lastUpdated = Date.now();
+          updateSaveStatus();
+          renderDemoFileTree();
+          saveToLocalStorage();
+          showToast('Saved');
+        }
+        return;
+      }
+      return originalSaveCurrentFile();
+    };
+
+    // Override create new file for demo mode
+    const originalCreateNewFile = createNewFile;
+    createNewFile = async function(filename) {
+      if (state.demoMode) {
+        if (!filename.endsWith('.flow')) filename += '.flow';
+        if (state.files.has(filename)) {
+          showToast('File already exists');
+          return;
+        }
+        
+        const content = `// ${filename.replace('.flow', '')}
+
+Start [shape: oval]
+Process
+End [shape: oval]
+
+Start > Process
+Process > End`;
+
+        state.files.set(filename, { handle: null, content, modified: false, lastUpdated: Date.now() });
+        renderDemoFileTree();
+        openDemoFile(filename);
+        saveToLocalStorage();
+        showToast('File created');
+        return;
+      }
+      return originalCreateNewFile(filename);
+    };
+
+    // Override delete for demo mode
+    const originalDeleteCurrentFile = deleteCurrentFile;
+    deleteCurrentFile = async function() {
+      if (state.demoMode) {
+        state.files.delete(state.currentFile);
+        state.currentFile = null;
+        editor.value = '';
+        canvas.innerHTML = '';
+        renderDemoFileTree();
+        
+        // Open first remaining file
+        const firstFile = getSortedFiles()[0];
+        if (firstFile) openDemoFile(firstFile);
+        
+        saveToLocalStorage();
+        showToast('File deleted');
+        return;
+      }
+      return originalDeleteCurrentFile();
+    };
+
+    // Override refresh for demo mode
+    const originalRefreshFileTree = refreshFileTree;
+    refreshFileTree = async function() {
+      if (state.demoMode) {
+        renderDemoFileTree();
+        return;
+      }
+      return originalRefreshFileTree();
+    };
+
+    // Update save status for demo mode
+    const originalUpdateSaveStatus = updateSaveStatus;
+    updateSaveStatus = function() {
+      const fileData = state.currentFile ? state.files.get(state.currentFile) : null;
+      
+      if (fileData?.modified) {
+        saveStatus.textContent = state.demoMode ? 'Modified (demo)' : 'Modified';
+        statusDot.classList.add('modified');
+        statusDot.classList.remove('error');
+      } else {
+        saveStatus.textContent = state.demoMode ? 'Demo mode' : 'Saved';
+        statusDot.classList.remove('modified', 'error');
+      }
+    };
+
+    // Track modifications in demo mode
+    editor.addEventListener('input', () => {
+      if (state.currentFile) {
+        const fileData = state.files.get(state.currentFile);
+        if (fileData) {
+          fileData.modified = fileData.content !== editor.value;
+          if (state.demoMode) renderDemoFileTree();
+          updateSaveStatus();
+        }
+      }
+      scheduleUpdate();
+    });
+
+    // ============================================
+    // Init
+    // ============================================
+
+    if (!hasFileSystemAccess) {
+      document.querySelector('.no-project p').textContent = 'Your browser does not support the File System Access API. Please use Chrome, Edge, or another Chromium-based browser for full functionality. Loading demo mode...';
+    }
+
+    // Load versions from localStorage
+    loadVersions();
+
+    // Always start with sample project
+    loadSampleProject();
+  </script>
+</body>
+</html>
