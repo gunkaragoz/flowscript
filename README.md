@@ -1,6 +1,28 @@
 # flowscript
 Simple intuitive offline flow chart diagramming tool inspired by eraser
 
+## Version
+
+Current version: **0.1.5**
+
+### Versioning Guidelines
+
+This project follows [Semantic Versioning](https://semver.org/) with automated version bumping:
+
+- **Patch version** (0.0.X): Automatically incremented for bug fixes
+  - Use commit prefix: `fix:` or `bugfix:`
+  - Example: `fix: correct PNG export clipping issue`
+
+- **Minor version** (0.X.0): Automatically incremented for new features
+  - Use commit prefix: `feat:` or `feature:`
+  - Example: `feat: add dark mode support`
+
+- **Major version** (X.0.0): Manually set for breaking changes
+  - Requires manual update to `version.json`
+
+When you push to the `main` branch with commits using conventional commit prefixes (`fix:` or `feat:`), the version will automatically bump and create a new release tag.
+
+---
 
 # FlowScript Best Practices Guide
 
