@@ -2455,7 +2455,7 @@ Process > End`;
     });
 
     document.getElementById('exportPngBtn').addEventListener('click', () => {
-      const svgContent = canvas.innerHTML;
+      const svgContent = canvas.outerHTML;
       if (!svgContent) return;
       const img = new Image();
       img.onload = () => {
