@@ -5,8 +5,6 @@
 FlowScript is a browser-based flowchart editor that uses a clean text syntax to create beautiful diagrams. Work entirely offline with local file system access, automatic version history, and real-time rendering powered by ELK (Eclipse Layout Kernel).
 
 🔗 **Live Demo:** [https://gunkaragoz.github.io/flowscript/](https://gunkaragoz.github.io/flowscript/)
-📦 **Current Version:** 0.3.0
-👤 **Author:** [Gün](https://gnkz.net)
 
 ---
 
@@ -339,4 +337,4 @@ Personal project - feel free to use and learn from it.
 
 ---
 
-**Made with ❤️ by [Gün](https://gnkz.net)**
+**This is vibe-coded by [Gün](https://gnkz.net) with Claude Code**
