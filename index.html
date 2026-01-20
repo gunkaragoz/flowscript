@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
   <style>
     * {
       margin: 0;
@@ -2522,32 +2523,27 @@ Process > End`;
                 const lx = l.x + ox + bx;
                 const ly = l.y + oy + by;
 
-                // Simple inline label style like Eraser.io
+                // Eraser.io style: simple text on edge, minimal background
                 const fontSize = 10;
-                const padding = 3;
+                const padding = 2;
 
-                // Single line or wrapped text
+                // Wrap text if needed
                 const maxLabelWidth = 80;
                 const lines = wrapText(l.text, maxLabelWidth);
                 const lineHeight = 12;
 
-                // Calculate tight dimensions
+                // Calculate text dimensions for subtle background
                 const longestLine = Math.max(...lines.map(line => line.length));
-                const textWidth = longestLine * 6; // Approximate character width
-                const textHeight = lines.length * lineHeight;
-
-                // Small background box, positioned above the line
+                const textWidth = longestLine * 6;
                 const boxWidth = textWidth + padding * 2;
-                const boxHeight = textHeight + padding * 2;
-                const boxX = lx - boxWidth / 2;
-                const boxY = ly - boxHeight / 2;
+                const boxHeight = lines.length * lineHeight + padding * 2;
 
-                // Draw minimal background (white/theme background)
-                svg += `<rect x="${boxX}" y="${boxY}" width="${boxWidth}" height="${boxHeight}" fill="${nodeFill}" stroke="${edgeStroke}" stroke-width="0.5" rx="2"/>`;
+                // Very subtle background for readability (semi-transparent)
+                const bgColor = nodeFill === '#fff' || nodeFill === '#ffffff' ? 'rgba(255,255,255,0.9)' : 'rgba(30,30,30,0.9)';
+                svg += `<rect x="${lx - boxWidth/2}" y="${ly - boxHeight/2}" width="${boxWidth}" height="${boxHeight}" fill="${bgColor}" rx="2" stroke="none"/>`;
 
-                // Draw text lines, centered and positioned inline
+                // Draw text centered on edge
                 const textStartY = ly - (lines.length - 1) * lineHeight / 2;
-
                 lines.forEach((line, i) => {
                   svg += `<text x="${lx}" y="${textStartY + i * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="${textDim}" font-size="${fontSize}" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
                 });
@@ -2569,11 +2565,14 @@ Process > End`;
         const textMode = node.text || 'wrap';
         const label = node.label || node.id;
 
+        // Determine text color based on background
+        const textColor = node.color && isDarkColor(node.color) ? '#ffffff' : nodeText;
+
         svg += renderShape(node.shape, x, y, w, h, fill, nodeStroke);
 
         // Icon
         if (hasIcon) {
-          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${nodeText}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[node.icon]}"/></svg></g>`;
+          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[node.icon]}"/></svg></g>`;
         }
 
         // Text rendering based on mode
@@ -2589,27 +2588,27 @@ Process > End`;
           if (textWidth > availableWidth) {
             fontSize = Math.max(TEXT_CONFIG.minFontSize, Math.floor(TEXT_CONFIG.fontSize * availableWidth / textWidth));
           }
-          svg += `<text x="${centerX}" y="${y + h / 2 + fontSize / 3}" text-anchor="middle" fill="${nodeText}" font-size="${fontSize}" font-family="DM Sans,sans-serif" font-weight="500">${esc(label)}</text>`;
+          svg += `<text x="${centerX}" y="${y + h / 2 + fontSize / 3}" text-anchor="middle" fill="${textColor}" font-size="${fontSize}" font-family="DM Sans,sans-serif" font-weight="500">${esc(label)}</text>`;
           
         } else if (textMode === 'clip') {
           // Clip mode: truncate with ellipsis, show full text on hover
           const maxChars = Math.floor(availableWidth / TEXT_CONFIG.charWidth);
           const displayText = label.length > maxChars ? label.slice(0, maxChars - 1) + '…' : label;
           const clipId = `clip_${p.id.replace(/[^a-zA-Z0-9]/g, '_')}`;
-          
+
           svg += `<defs><clipPath id="${clipId}"><rect x="${textX}" y="${y}" width="${availableWidth}" height="${h}"/></clipPath></defs>`;
-          svg += `<text x="${centerX}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${nodeText}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500" clip-path="url(#${clipId})">`;
+          svg += `<text x="${centerX}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${textColor}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500" clip-path="url(#${clipId})">`;
           svg += `${esc(displayText)}<title>${esc(label)}</title></text>`;
-          
+
         } else {
           // Wrap mode (default): wrap text into multiple lines
           const lines = wrapText(label, availableWidth);
           const lineHeight = TEXT_CONFIG.lineHeight;
           const totalTextHeight = lines.length * lineHeight;
           const startY = y + (h - totalTextHeight) / 2 + lineHeight * 0.7;
-          
+
           lines.forEach((line, i) => {
-            svg += `<text x="${centerX}" y="${startY + i * lineHeight}" text-anchor="middle" fill="${nodeText}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500">${esc(line)}</text>`;
+            svg += `<text x="${centerX}" y="${startY + i * lineHeight}" text-anchor="middle" fill="${textColor}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500">${esc(line)}</text>`;
           });
         }
       });
@@ -2664,6 +2663,23 @@ Process > End`;
 
     function esc(t) {
       return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // Determine if a color is dark and needs white text
+    function isDarkColor(hexColor) {
+      if (!hexColor || !hexColor.startsWith('#')) return false;
+
+      // Convert hex to RGB
+      const hex = hexColor.replace('#', '');
+      const r = parseInt(hex.substr(0, 2), 16);
+      const g = parseInt(hex.substr(2, 2), 16);
+      const b = parseInt(hex.substr(4, 2), 16);
+
+      // Calculate relative luminance
+      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+      // Return true if dark (luminance < 0.5)
+      return luminance < 0.5;
     }
 
     // ============================================
