@@ -2206,10 +2206,10 @@ Process > End`;
     function calculateEdgeLabelDimensions(labelText) {
       if (!labelText) return null;
 
-      const maxWidth = 100; // Max width for edge labels
+      const maxWidth = 80; // Max width for edge labels (tighter)
       const charWidth = 6; // Character width for font size 10
-      const lineHeight = 14;
-      const padding = 4;
+      const lineHeight = 12; // Tighter line height
+      const padding = 3; // Smaller padding
 
       const lines = wrapText(labelText, maxWidth);
       const width = Math.max(...lines.map(l => l.length * charWidth)) + padding * 2;
@@ -2330,30 +2330,34 @@ Process > End`;
                 const lx = l.x + ox + bx;
                 const ly = l.y + oy + by;
 
-                // Use the dimensions we told ELK about
-                const maxLabelWidth = 100;
-                const lines = wrapText(l.text, maxLabelWidth);
-                const lineHeight = 14;
+                // Simple inline label style like Eraser.io
                 const fontSize = 10;
-                const padding = 4;
+                const padding = 3;
 
-                // Use ELK's calculated width and height
-                const rectWidth = l.width;
-                const rectHeight = l.height;
+                // Single line or wrapped text
+                const maxLabelWidth = 80;
+                const lines = wrapText(l.text, maxLabelWidth);
+                const lineHeight = 12;
 
-                // Center the label at the position ELK calculated
-                const rectX = lx - rectWidth / 2;
-                const rectY = ly - rectHeight / 2;
+                // Calculate tight dimensions
+                const longestLine = Math.max(...lines.map(line => line.length));
+                const textWidth = longestLine * 6; // Approximate character width
+                const textHeight = lines.length * lineHeight;
 
-                // Draw background rectangle
-                svg += `<rect x="${rectX}" y="${rectY}" width="${rectWidth}" height="${rectHeight}" fill="${nodeFill}" rx="2"/>`;
+                // Small background box, positioned above the line
+                const boxWidth = textWidth + padding * 2;
+                const boxHeight = textHeight + padding * 2;
+                const boxX = lx - boxWidth / 2;
+                const boxY = ly - boxHeight / 2;
 
-                // Draw wrapped text lines, centered in the rectangle
-                const totalTextHeight = lines.length * lineHeight;
-                const textStartY = rectY + (rectHeight - totalTextHeight) / 2 + lineHeight * 0.7;
+                // Draw minimal background (white/theme background)
+                svg += `<rect x="${boxX}" y="${boxY}" width="${boxWidth}" height="${boxHeight}" fill="${nodeFill}" stroke="${edgeStroke}" stroke-width="0.5" rx="2"/>`;
+
+                // Draw text lines, centered and positioned inline
+                const textStartY = ly - (lines.length - 1) * lineHeight / 2;
 
                 lines.forEach((line, i) => {
-                  svg += `<text x="${lx}" y="${textStartY + i * lineHeight}" text-anchor="middle" fill="${textDim}" font-size="${fontSize}" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+                  svg += `<text x="${lx}" y="${textStartY + i * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="${textDim}" font-size="${fontSize}" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
                 });
               }
             });
