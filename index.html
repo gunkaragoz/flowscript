@@ -1197,12 +1197,56 @@ Ctrl+O          Open folder</pre>
       .then(data => {
         const versionEl = document.getElementById('appVersion');
         if (versionEl) {
-          versionEl.textContent = `v${data.version}`;
+          const currentVersion = data.version;
+          versionEl.textContent = `v${currentVersion}`;
+
+          // Check for updates
+          checkForUpdates(currentVersion, versionEl);
         }
       })
       .catch(err => {
         console.warn('Failed to load version:', err);
       });
+
+    // Check for new version on GitHub
+    function checkForUpdates(currentVersion, versionEl) {
+      fetch('https://api.github.com/repos/gunkaragoz/flowscript/releases/latest')
+        .then(res => res.json())
+        .then(release => {
+          const latestVersion = release.tag_name.replace(/^v/, ''); // Remove 'v' prefix
+
+          if (isNewerVersion(latestVersion, currentVersion)) {
+            // Add update indicator
+            const updateIndicator = document.createElement('a');
+            updateIndicator.href = release.html_url;
+            updateIndicator.target = '_blank';
+            updateIndicator.rel = 'noopener noreferrer';
+            updateIndicator.innerHTML = ' *';
+            updateIndicator.title = 'There is a new version available';
+            updateIndicator.style.cssText = 'color: #22c55e; text-decoration: none; cursor: pointer; font-weight: 600;';
+            versionEl.appendChild(updateIndicator);
+          }
+        })
+        .catch(err => {
+          console.warn('Failed to check for updates:', err);
+        });
+    }
+
+    // Compare semantic versions (e.g., "0.4.1" vs "0.5.0")
+    function isNewerVersion(latest, current) {
+      const latestParts = latest.split('.').map(Number);
+      const currentParts = current.split('.').map(Number);
+
+      for (let i = 0; i < 3; i++) {
+        const latestPart = latestParts[i] || 0;
+        const currentPart = currentParts[i] || 0;
+
+        if (latestPart > currentPart) return true;
+        if (latestPart < currentPart) return false;
+      }
+
+      return false; // Versions are equal
+    }
 
     // State
     let state = {
