@@ -2350,11 +2350,14 @@ Process > End`;
           'elk.direction': elkDirection,
           'elk.spacing.nodeNode': '40',
           'elk.layered.spacing.nodeNodeBetweenLayers': '50',
+          'elk.layered.spacing.edgeNodeBetweenLayers': '15',
           'elk.edgeRouting': 'ORTHOGONAL',
           'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
           'elk.layered.layering.strategy': 'NETWORK_SIMPLEX',
           'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-          'elk.edgeLabels.placement': 'CENTER'
+          'elk.edgeLabels.placement': 'CENTER',
+          'elk.edgeLabels.inline': 'true',
+          'elk.spacing.edgeLabel': '5'
         },
         children: elkChildren,
         edges: elkEdges
