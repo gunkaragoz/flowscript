@@ -1009,6 +1009,86 @@ Frontend > Backend: REST API</pre>
       </div>
 
       <div class="help-section">
+        <h3>Icons (Tabler Icons)</h3>
+        <pre style="font-size: 10px; line-height: 1.4;">// Common
+user, users, settings, home, bell
+
+// Development
+code, terminal, git, bug
+
+// Infrastructure
+server, database, cloud, api, network
+
+// Communication
+mail, message, phone, send
+
+// Files
+file, folder, download, upload
+
+// Status
+check, x, alert, info, plus, minus
+
+// Security
+lock, key, shield
+
+// Media
+photo, video, music
+
+// Navigation
+arrow, chevron, external, link
+
+// Time
+clock, calendar
+
+// Charts
+chart, graph
+
+// Business
+shopping, credit, currency
+
+// Location
+world, location, map
+
+// Tech
+docker, brand, cpu
+
+// Social
+share, star, heart
+
+Usage: Node [icon: user]
+See: github.com/tabler/tabler-icons</pre>
+      </div>
+
+      <div class="help-section">
+        <h3>Colors</h3>
+        <pre style="font-size: 10px; line-height: 1.4;">// Primary
+red, green, blue, yellow, purple
+orange, pink, cyan
+
+// Extended
+teal, indigo, violet, fuchsia, rose
+lime, emerald, sky, amber
+
+// Neutrals
+gray, slate, zinc, stone
+
+// Special
+brown, black, white
+
+// Light variants
+light-red, light-green, light-blue
+light-yellow, light-purple, light-pink
+light-orange, light-cyan
+
+// Dark variants
+dark-red, dark-green, dark-blue
+dark-purple, dark-orange
+
+Usage: Node [color: emerald]
+Or hex: Node [color: #3b82f6]</pre>
+      </div>
+
+      <div class="help-section">
         <h3>Direction</h3>
         <pre>direction down    // default
 direction up
@@ -1271,25 +1351,93 @@ Ctrl+O          Open folder</pre>
 
     const elk = new ELK();
 
-    // Icons for nodes
+    // Icons for nodes (Tabler Icons - https://github.com/tabler/tabler-icons)
     const icons = {
-      server: 'M2 2h20v6H2zm0 8h20v6H2zm0 8h20v4H2zM6 5h.01M6 13h.01M6 19h.01',
-      database: 'M12 2C6.48 2 2 4.02 2 6.5v11C2 19.98 6.48 22 12 22s10-2.02 10-4.5v-11C22 4.02 17.52 2 12 2zM2 9.5c0 2.48 4.48 4.5 10 4.5s10-2.02 10-4.5',
-      api: 'M4 4h16v16H4zM9 9h6M9 12h6M9 15h3',
-      cache: 'M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5',
-      postgresql: 'M12 2C8 2 5 5 5 9c0 3 2 6 5 7v4l4-4c3-1 5-4 5-7 0-4-3-7-7-7zM9 9h.01M12 9h.01M15 9h.01',
-      user: 'M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2M12 11a4 4 0 100-8 4 4 0 000 8z',
-      lock: 'M19 11H5a2 2 0 00-2 2v7a2 2 0 002 2h14a2 2 0 002-2v-7a2 2 0 00-2-2zM7 11V7a5 5 0 0110 0v4',
-      mail: 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2zM22 6l-10 7L2 6',
-      globe: 'M12 2a10 10 0 100 20 10 10 0 000-20zM2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z',
-      code: 'M16 18l6-6-6-6M8 6l-6 6 6 6',
-      check: 'M20 6L9 17l-5-5',
-      x: 'M18 6L6 18M6 6l12 12',
-      alert: 'M12 2L2 22h20L12 2zM12 9v4M12 17h.01',
-      'aws-lambda': 'M2 20L12 4l10 16H2zM12 4v16',
-      dynamodb: 'M3 5h18v14H3zM3 9h18M3 13h18M7 5v14',
-      docker: 'M3 11h3v3H3zm4 0h3v3H7zm4 0h3v3h-3zm4 0h3v3h-3zM7 7h3v3H7zm4 0h3v3h-3zM11 3h3v3h-3z',
+      // Common
+      user: 'M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0M6 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2',
+      users: 'M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2M16 3.13a4 4 0 0 1 0 7.75M21 21v-2a4 4 0 0 0 -3 -3.85',
+      settings: 'M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065zM9 12a3 3 0 1 0 6 0a3 3 0 0 0 -6 0',
+      home: 'M5 12l-2 0l9 -9l9 9l-2 0l0 7a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2l0 -7z',
+      bell: 'M10 5a2 2 0 1 1 4 0a7 7 0 0 1 4 6v3a4 4 0 0 0 2 3h-16a4 4 0 0 0 2 -3v-3a7 7 0 0 1 4 -6M9 17v1a3 3 0 0 0 6 0v-1',
+
+      // Development
+      code: 'M7 8l-4 4l4 4M17 8l4 4l-4 4M14 4l-4 16',
+      terminal: 'M5 7l5 5l-5 5M12 19l7 0',
+      git: 'M16 12m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M12 8m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M12 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M12 15v-6M15 11l-2 -2M11 7l-1.9 -1.9M13.446 2.6l7.955 7.954a2.045 2.045 0 0 1 0 2.892l-7.955 7.955a2.045 2.045 0 0 1 -2.892 0l-7.955 -7.955a2.045 2.045 0 0 1 0 -2.892l7.955 -7.955a2.045 2.045 0 0 1 2.892 0z',
+      bug: 'M9 9v-1a3 3 0 0 1 6 0v1M8 9h8a6 6 0 0 1 1 3v3a5 5 0 0 1 -10 0v-3a6 6 0 0 1 1 -3M3 13l4 0M17 13l4 0M12 20l0 -6M4 19l3.35 -2M20 19l-3.35 -2M4 7l3.75 2.4M20 7l-3.75 2.4',
+
+      // Infrastructure
+      server: 'M3 4m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3zM3 12m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3zM7 8l0 .01M7 16l0 .01',
+      database: 'M12 6m-8 0a8 3 0 1 0 16 0a8 3 0 1 0 -16 0M4 6v6a8 3 0 0 0 16 0v-6M4 12v6a8 3 0 0 0 16 0v-6',
+      cloud: 'M6.657 18c-2.572 0 -4.657 -2.007 -4.657 -4.483c0 -2.475 2.085 -4.482 4.657 -4.482c.393 -1.762 1.794 -3.2 3.675 -3.773c1.88 -.572 3.956 -.193 5.444 1c1.488 1.19 2.162 3.007 1.77 4.769h.99c1.913 0 3.464 1.56 3.464 3.486c0 1.927 -1.551 3.487 -3.465 3.487h-11.878',
+      api: 'M4 13h5M12 16v-8h3a2 2 0 0 1 2 2v1a2 2 0 0 1 -2 2h-3M20 8v8M9 16v-5.5a2.5 2.5 0 0 0 -5 0v5.5',
+      network: 'M6 9a6 6 0 1 0 12 0a6 6 0 0 0 -12 0M12 3c1.333 .333 2 2.333 2 6s-.667 5.667 -2 6M12 3c-1.333 .333 -2 2.333 -2 6s.667 5.667 2 6M6 9h12M3 20h7M14 20h7M10 20a2 2 0 1 0 4 0a2 2 0 0 0 -4 0M12 15v3',
+
+      // Communication
+      mail: 'M3 7a2 2 0 0 1 2 -2h14a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-10zM3 7l9 6l9 -6',
+      message: 'M8 9h8M8 13h6M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12z',
+      phone: 'M5 4h4l2 5l-2.5 1.5a11 11 0 0 0 5 5l1.5 -2.5l5 2v4a2 2 0 0 1 -2 2a16 16 0 0 1 -15 -15a2 2 0 0 1 2 -2',
+      send: 'M10 14l11 -11M21 3l-6.5 18a.55 .55 0 0 1 -1 0l-3.5 -7l-7 -3.5a.55 .55 0 0 1 0 -1l18 -6.5',
+
+      // Files & Documents
+      file: 'M14 3v4a1 1 0 0 0 1 1h4M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z',
+      folder: 'M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2',
+      download: 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2M7 11l5 5l5 -5M12 4l0 12',
+      upload: 'M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2M7 9l5 -5l5 5M12 4l0 12',
+
+      // Status & Actions
+      check: 'M5 12l5 5l10 -10',
+      x: 'M18 6l-12 12M6 6l12 12',
+      alert: 'M12 9v4M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0zM12 16h.01',
+      info: 'M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M12 9h.01M11 12h1v4h1',
+      plus: 'M12 5l0 14M5 12l14 0',
+      minus: 'M5 12l14 0',
+
+      // Security
+      lock: 'M5 13a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v6a2 2 0 0 1 -2 2h-10a2 2 0 0 1 -2 -2v-6zM11 16a1 1 0 1 0 2 0a1 1 0 0 0 -2 0M8 11v-4a4 4 0 1 1 8 0v4',
+      key: 'M16.555 3.843l3.602 3.602a2.877 2.877 0 0 1 0 4.069l-2.643 2.643a2.877 2.877 0 0 1 -4.069 0l-.301 -.301l-6.558 6.558a2 2 0 0 1 -1.239 .578l-.175 .008h-1.172a1 1 0 0 1 -.993 -.883l-.007 -.117v-1.172a2 2 0 0 1 .467 -1.284l.119 -.13l.414 -.414h2v-2h2v-2l2.144 -2.144l-.301 -.301a2.877 2.877 0 0 1 0 -4.069l2.643 -2.643a2.877 2.877 0 0 1 4.069 0zM15 9h.01',
+      shield: 'M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3',
+
+      // Media & Content
+      photo: 'M15 8h.01M3 6a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v12a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3v-12zM3 16l5 -5c.928 -.893 2.072 -.893 3 0l5 5M14 14l1 -1c.928 -.893 2.072 -.893 3 0l3 3',
+      video: 'M15 10l4.553 -2.276a1 1 0 0 1 1.447 .894v6.764a1 1 0 0 1 -1.447 .894l-4.553 -2.276v-4zM3 6m0 2a2 2 0 0 1 2 -2h8a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-8a2 2 0 0 1 -2 -2z',
+      music: 'M3 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0M13 17a3 3 0 1 0 6 0a3 3 0 0 0 -6 0M9 17v-13h10v13M9 8h10',
+
+      // Navigation
+      arrow: 'M5 12l14 0M5 12l6 6M5 12l6 -6',
+      chevron: 'M9 6l6 6l-6 6',
+      external: 'M12 6h-6a2 2 0 0 0 -2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-6M11 13l9 -9M15 4h5v5',
+      link: 'M9 15l6 -6M11 6l.463 -.536a5 5 0 0 1 7.071 7.072l-.534 .464M13 18l-.397 .534a5.068 5.068 0 0 1 -7.127 0a4.972 4.972 0 0 1 0 -7.071l.524 -.463',
+
+      // Time & Calendar
+      clock: 'M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M12 7v5l3 3',
+      calendar: 'M4 7a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12zM16 3v4M8 3v4M4 11h16M11 15h1M12 15v3',
+
+      // Charts & Analytics
+      chart: 'M3 13a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1zM15 9a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1zM9 5a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z',
+      graph: 'M4 19l16 0M4 15l4 -6l4 2l4 -5l4 4',
+
+      // Business & Commerce
+      shopping: 'M6 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 19m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0M17 17h-11v-14h-2M6 5l14 1l-1 7h-13',
+      credit: 'M3 5m0 3a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3zM3 10l18 0M7 15l.01 0M11 15l2 0',
+      currency: 'M16.7 8a3 3 0 0 0 -2.7 -2h-4a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6h-4a3 3 0 0 1 -2.7 -2M12 3v3m0 12v3',
+
+      // World & Location
+      world: 'M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0M3.6 9h16.8M3.6 15h16.8M11.5 3a17 17 0 0 0 0 18M12.5 3a17 17 0 0 1 0 18',
+      location: 'M9 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0M17.657 16.657l-4.243 4.243a2 2 0 0 1 -2.827 0l-4.244 -4.243a8 8 0 1 1 11.314 0z',
+      map: 'M3 7l6 -3l6 3l6 -3v13l-6 3l-6 -3l-6 3v-13M9 4v13M15 7v13',
+
+      // Tech & Brands
+      docker: 'M22 12.54c-1.804 -.345 -2.701 -1.08 -3.523 -2.94c-.487 .696 -1.102 1.568 -.92 2.4c.028 .238 -.32 1 -.557 1h-14c0 5.208 3.164 7 6.196 7c4.124 .022 7.828 -1.376 9.854 -5c1.146 -.101 2.296 -1.505 2.95 -2.46M5 10h3v3h-3zM8 10h3v3h-3zM11 10h3v3h-3zM8 7h3v3h-3zM11 7h3v3h-3zM11 4h3v3h-3zM4.571 18c1.5 0 2.047 -.074 2.958 -.78',
+      brand: 'M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3zM8 7m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0M3 16a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v2a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3zM8 16m-1 0a1 1 0 1 0 2 0a1 1 0 1 0 -2 0',
+      cpu: 'M5 5m0 1a1 1 0 0 1 1 -1h12a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-12a1 1 0 0 1 -1 -1zM9 9h6v6h-6zM3 10h2M3 14h2M19 10h2M19 14h2M10 3v2M14 3v2M10 19v2M14 19v2',
+
+      // Social
+      share: 'M6 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M18 6m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M18 18m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0M8.7 10.7l6.6 -3.4M8.7 13.3l6.6 3.4',
+      star: 'M12 17.75l-6.172 3.245l1.179 -6.873l-5 -4.867l6.9 -1l3.086 -6.253l3.086 6.253l6.9 1l-5 4.867l1.179 6.873z',
+      heart: 'M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572',
     };
+
 
     // Eraser-compatible shape mapping
     const shapeMap = {
@@ -1309,10 +1457,54 @@ Ctrl+O          Open folder</pre>
     };
 
     const colorPalette = {
-      red: '#ef4444', green: '#22c55e', blue: '#3b82f6',
-      yellow: '#eab308', purple: '#a855f7', orange: '#f97316',
-      pink: '#ec4899', cyan: '#06b6d4', gray: '#6b7280',
-      brown: '#a16207', black: '#18181b', white: '#fafafa'
+      // Primary colors
+      red: '#ef4444',
+      green: '#22c55e',
+      blue: '#3b82f6',
+      yellow: '#eab308',
+      purple: '#a855f7',
+      orange: '#f97316',
+      pink: '#ec4899',
+      cyan: '#06b6d4',
+
+      // Extended colors
+      teal: '#14b8a6',
+      indigo: '#6366f1',
+      violet: '#8b5cf6',
+      fuchsia: '#d946ef',
+      rose: '#f43f5e',
+      lime: '#84cc16',
+      emerald: '#10b981',
+      sky: '#0ea5e9',
+      amber: '#f59e0b',
+
+      // Neutrals
+      gray: '#6b7280',
+      slate: '#64748b',
+      zinc: '#71717a',
+      stone: '#78716c',
+
+      // Special
+      brown: '#a16207',
+      black: '#18181b',
+      white: '#fafafa',
+
+      // Lighter variants (pastel)
+      'light-red': '#fca5a5',
+      'light-green': '#86efac',
+      'light-blue': '#93c5fd',
+      'light-yellow': '#fde047',
+      'light-purple': '#c084fc',
+      'light-pink': '#f9a8d4',
+      'light-orange': '#fdba74',
+      'light-cyan': '#67e8f9',
+
+      // Darker variants
+      'dark-red': '#991b1b',
+      'dark-green': '#166534',
+      'dark-blue': '#1e40af',
+      'dark-purple': '#6b21a8',
+      'dark-orange': '#9a3412'
     };
 
     // ============================================
