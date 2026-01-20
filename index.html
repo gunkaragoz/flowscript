@@ -2255,10 +2255,29 @@ Process > End`;
               svg += `<path d="${d}" fill="none" stroke="${edgeStroke}" stroke-width="1.5" marker-end="url(#arrow)"/>`;
             });
             (e.labels || []).forEach(l => {
-              if (l.x !== undefined) {
+              if (l.x !== undefined && l.text) {
                 const lx = l.x + ox + bx, ly = l.y + oy + by;
-                svg += `<rect x="${lx - 2}" y="${ly - 1}" width="${l.width + 4}" height="${l.height + 2}" fill="${nodeFill}" rx="2"/>`;
-                svg += `<text x="${lx + l.width / 2}" y="${ly + 12}" text-anchor="middle" fill="${textDim}" font-size="10" font-family="DM Sans,sans-serif">${esc(l.text)}</text>`;
+
+                // Wrap edge label text
+                const maxLabelWidth = Math.min(120, l.width); // Limit max width for readability
+                const lines = wrapText(l.text, maxLabelWidth);
+                const lineHeight = 14;
+                const fontSize = 10;
+                const padding = 4;
+
+                // Calculate total height needed
+                const totalTextHeight = lines.length * lineHeight;
+                const rectHeight = totalTextHeight + padding * 2;
+                const rectWidth = Math.max(l.width, ...lines.map(line => line.length * 6)) + padding * 2;
+
+                // Draw background rectangle
+                svg += `<rect x="${lx - padding}" y="${ly - padding}" width="${rectWidth}" height="${rectHeight}" fill="${nodeFill}" rx="2"/>`;
+
+                // Draw wrapped text lines
+                const startY = ly + lineHeight * 0.7;
+                lines.forEach((line, i) => {
+                  svg += `<text x="${lx + rectWidth / 2 - padding}" y="${startY + i * lineHeight}" text-anchor="middle" fill="${textDim}" font-size="${fontSize}" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+                });
               }
             });
           }
