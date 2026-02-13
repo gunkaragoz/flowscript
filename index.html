@@ -2571,7 +2571,7 @@ Process > End`;
           'elk.algorithm': 'layered',
           'elk.direction': elkDirection,
           'elk.spacing.nodeNode': '30',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '40',
           'elk.edgeRouting': 'ORTHOGONAL',
           'elk.edgeLabels.placement': 'CENTER',
           'elk.edgeLabels.inline': 'true',
@@ -3959,36 +3959,64 @@ Text Modes [color: teal] {
 }
 
 // === CONNECTIONS ===
+Connections [color: orange] {
+  Arrow Start [shape: oval, color: green]
+  Arrow End [shape: oval]
+  Line Start [shape: oval, color: green]
+  Line End [shape: oval]
+  Dotted Start [shape: oval, color: green]
+  Dotted End [shape: oval]
+  DotArrow Start [shape: oval, color: green]
+  DotArrow End [shape: oval]
+  Bidi Left [shape: oval, color: green]
+  Bidi Right [shape: oval]
+  Reverse End [shape: oval, color: green]
+  Reverse Start [shape: oval]
+  Chain A [shape: oval, color: green]
+  Chain B [shape: oval]
+  Chain C [shape: oval]
+  Branch Root [shape: oval, color: green]
+  Branch X [shape: oval]
+  Branch Y [shape: oval]
+  Branch Z [shape: oval]
+}
+
+// Arrow: A > B
+Arrow Start > Arrow End : arrow
+// Line: A - B
+Line Start - Line End : line
+// Dotted: A -- B
+Dotted Start -- Dotted End : dotted
+// Dotted arrow: A --> B
+DotArrow Start --> DotArrow End : dotted arrow
+// Bidirectional: A <> B
+Bidi Left <> Bidi Right : bidirectional
+// Reverse: A < B
+Reverse Start < Reverse End : reverse
+// Chain: A > B > C
+Chain A > Chain B > Chain C : chain
+// Branch: A > B, C, D
+Branch Root > Branch X, Branch Y, Branch Z
+
+// Shape chain
 Rectangle > Oval
-Oval > Diamond : labeled arrow
-Diamond > Cylinder
-Cylinder > Parallelogram
-Parallelogram > Hexagon
-Hexagon > Trapezoid
-Trapezoid > Triangle
-Triangle > Document
-Document > Ellipse
-Ellipse > Star
+Oval > Diamond : labeled
+Diamond > Cylinder > Parallelogram > Hexagon
+Hexagon > Trapezoid > Triangle > Document
+Document > Ellipse > Star
 
-// Solid line (no arrow)
+// Color connections
 Red - Green
-
-// Dotted line
 Blue -- Yellow
-
-// Dotted arrow
 Purple --> Orange
-
-// Bidirectional
 Pink <> Cyan
-
-// Reverse arrow
 Amber < Teal
 
-// Group connections
+// Group connections: using different types
 Shapes > Colors : solid arrow
-Colors > Icons
-Icons > Text Modes`,
+Colors -- Icons : dotted line
+Icons --> Text Modes : dotted arrow
+Text Modes <> Connections : bidirectional`,
 
       'showcase-right.flow': `// FlowScript Showcase (Left-to-Right)
 // Same showcase in right direction
@@ -4040,36 +4068,64 @@ Text Modes [color: teal] {
 }
 
 // === CONNECTIONS ===
+Connections [color: orange] {
+  Arrow Start [shape: oval, color: green]
+  Arrow End [shape: oval]
+  Line Start [shape: oval, color: green]
+  Line End [shape: oval]
+  Dotted Start [shape: oval, color: green]
+  Dotted End [shape: oval]
+  DotArrow Start [shape: oval, color: green]
+  DotArrow End [shape: oval]
+  Bidi Left [shape: oval, color: green]
+  Bidi Right [shape: oval]
+  Reverse End [shape: oval, color: green]
+  Reverse Start [shape: oval]
+  Chain A [shape: oval, color: green]
+  Chain B [shape: oval]
+  Chain C [shape: oval]
+  Branch Root [shape: oval, color: green]
+  Branch X [shape: oval]
+  Branch Y [shape: oval]
+  Branch Z [shape: oval]
+}
+
+// Arrow: A > B
+Arrow Start > Arrow End : arrow
+// Line: A - B
+Line Start - Line End : line
+// Dotted: A -- B
+Dotted Start -- Dotted End : dotted
+// Dotted arrow: A --> B
+DotArrow Start --> DotArrow End : dotted arrow
+// Bidirectional: A <> B
+Bidi Left <> Bidi Right : bidirectional
+// Reverse: A < B
+Reverse Start < Reverse End : reverse
+// Chain: A > B > C
+Chain A > Chain B > Chain C : chain
+// Branch: A > B, C, D
+Branch Root > Branch X, Branch Y, Branch Z
+
+// Shape chain
 Rectangle > Oval
-Oval > Diamond : labeled arrow
-Diamond > Cylinder
-Cylinder > Parallelogram
-Parallelogram > Hexagon
-Hexagon > Trapezoid
-Trapezoid > Triangle
-Triangle > Document
-Document > Ellipse
-Ellipse > Star
+Oval > Diamond : labeled
+Diamond > Cylinder > Parallelogram > Hexagon
+Hexagon > Trapezoid > Triangle > Document
+Document > Ellipse > Star
 
-// Solid line (no arrow)
+// Color connections
 Red - Green
-
-// Dotted line
 Blue -- Yellow
-
-// Dotted arrow
 Purple --> Orange
-
-// Bidirectional
 Pink <> Cyan
-
-// Reverse arrow
 Amber < Teal
 
-// Group connections
+// Group connections: using different types
 Shapes > Colors : solid arrow
-Colors > Icons
-Icons > Text Modes`,
+Colors -- Icons : dotted line
+Icons --> Text Modes : dotted arrow
+Text Modes <> Connections : bidirectional`,
 
       'order-process.flow': `// E-Commerce Order Process
 
