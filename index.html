@@ -3867,20 +3867,28 @@ Ship Order > Complete`
       if (saved) {
         // Restore saved state
         Object.entries(saved.files).forEach(([name, fileData]) => {
-          state.files.set(name, { 
-            handle: null, 
-            content: fileData.content, 
+          state.files.set(name, {
+            handle: null,
+            content: fileData.content,
             modified: false,
             lastUpdated: fileData.lastUpdated
           });
         });
-        
+
+        // Merge in any new sample files that didn't exist in the saved state
+        const now = Date.now();
+        Object.entries(sampleFiles).forEach(([name, content]) => {
+          if (!state.files.has(name)) {
+            state.files.set(name, { handle: null, content, modified: false, lastUpdated: now });
+          }
+        });
+
         if (saved.sortBy) state.sortBy = saved.sortBy;
         if (saved.theme) {
           state.theme = saved.theme;
           document.body.setAttribute('data-theme', state.theme);
         }
-        
+
         // Update UI
         document.getElementById('projectLabel').innerHTML = '<strong>Local Project</strong> <span style="color: var(--text-muted); font-size: 11px;">(browser)</span>';
         
