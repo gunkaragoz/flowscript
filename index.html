@@ -3260,8 +3260,6 @@ Process > End`;
         c.width = img.width * 2; c.height = img.height * 2;
         const ctx = c.getContext('2d');
         ctx.scale(2, 2);
-        ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--bg-canvas').trim();
-        ctx.fillRect(0, 0, img.width, img.height);
         ctx.drawImage(img, 0, 0);
         c.toBlob(blob => download(blob, (state.currentFile || 'diagram').replace('.flow', '.png')), 'image/png');
       };
