@@ -3003,8 +3003,8 @@ Process > End`;
         const textMode = node.text || 'wrap';
         const label = node.label || node.id;
 
-        // Determine text color based on background
-        const textColor = node.color && isDarkColor(node.color) ? '#ffffff' : nodeText;
+        // Determine text color based on background for WCAG contrast
+        const textColor = node.color ? (isDarkColor(node.color) ? '#ffffff' : '#1a1a1a') : nodeText;
 
         svg += renderShape(node.shape, x, y, w, h, fill, nodeStroke);
 
@@ -3115,11 +3115,20 @@ Process > End`;
       const g = parseInt(hex.substr(2, 2), 16);
       const b = parseInt(hex.substr(4, 2), 16);
 
-      // Calculate relative luminance
-      const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+      // WCAG relative luminance (sRGB linearized)
+      const srgb = [r, g, b].map(c => {
+        c = c / 255;
+        return c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+      });
+      const L = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
 
-      // Return true if dark (luminance < 0.5)
-      return luminance < 0.5;
+      // WCAG contrast ratio: white text vs black text
+      // L_white = 1.0, L_black = 0.0
+      const contrastWithWhite = (1.05) / (L + 0.05);
+      const contrastWithBlack = (L + 0.05) / (0.05);
+
+      // Use dark text (#1a1a1a) when black contrast is higher (light bg)
+      return contrastWithWhite > contrastWithBlack;
     }
 
     // ============================================
