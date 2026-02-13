@@ -1011,7 +1011,7 @@ Frontend > Backend: REST API</pre>
 
       <div class="help-section">
         <h3>Icons (Tabler Icons - 5000+)</h3>
-        <pre style="font-size: 10px; line-height: 1.4;">// Use ANY icon from tabler-icons.io
+        <pre style="font-size: 10px; line-height: 1.4;">// Use ANY icon from tabler-icons.io <a href='https://tabler.io/icons' target='_blank'>Search</a>
 // Examples:
 user, users, settings, home, bell
 code, terminal, git, bug, brand-github
@@ -1028,8 +1028,8 @@ shopping-cart, credit-card, currency-dollar
 world, location, map-pin, compass
 docker, brand-aws, cpu, device-mobile
 share, star, heart, bookmark, thumb-up
+brand-aws,brand-google,brand-apple
 
-// Full library: tabler-icons.io
 Usage: Node [icon: brand-github]</pre>
       </div>
 
@@ -3656,6 +3656,167 @@ Cloud [color: orange] {
 Frontend > Backend: REST API
 Backend > Cloud: async jobs
 Cloud > Frontend: static assets`,
+
+      'showcase.flow': `// FlowScript Showcase (Top-Down)
+// Every shape, text mode, connection type, colors, icons & groups
+
+// === SHAPES ===
+Shapes [color: blue] {
+  Rectangle
+  Oval [shape: oval]
+  Diamond [shape: diamond]
+  Cylinder [shape: cylinder]
+  Parallelogram [shape: parallelogram]
+  Hexagon [shape: hexagon]
+  Trapezoid [shape: trapezoid]
+  Triangle [shape: triangle]
+  Document [shape: document]
+  Ellipse [shape: ellipse]
+  Star [shape: star]
+}
+
+// === COLORS ===
+Colors [color: gray] {
+  Red [color: red]
+  Green [color: green]
+  Blue [color: blue]
+  Yellow [color: yellow]
+  Purple [color: purple]
+  Orange [color: orange]
+  Pink [color: pink]
+  Cyan [color: cyan]
+  Teal [color: teal]
+  Amber [color: amber]
+}
+
+// === ICONS (from 5000+ Tabler Icons) ===
+Icons [color: purple] {
+  Rocket [icon: rocket, color: red]
+  User [icon: user, color: blue]
+  Database [icon: database, color: green]
+  Shield [icon: shield-check, color: yellow]
+  CPU [icon: cpu, color: orange]
+}
+
+// === TEXT MODES ===
+Text Modes [color: teal] {
+  Wrap mode is the default [label: Wrap mode is the default text mode]
+  Fit [text: fit, label: This is fit mode shrinking to one line]
+  Clip [text: clip, label: This is clip mode truncating long text with ellipsis]
+}
+
+// === CONNECTIONS ===
+Rectangle > Oval
+Oval > Diamond : labeled arrow
+Diamond > Cylinder
+Cylinder > Parallelogram
+Parallelogram > Hexagon
+Hexagon > Trapezoid
+Trapezoid > Triangle
+Triangle > Document
+Document > Ellipse
+Ellipse > Star
+
+// Solid line (no arrow)
+Red - Green
+
+// Dotted line
+Blue -- Yellow
+
+// Dotted arrow
+Purple --> Orange
+
+// Bidirectional
+Pink <> Cyan
+
+// Reverse arrow
+Amber < Teal
+
+// Group connections
+Shapes > Colors : solid arrow
+Colors > Icons
+Icons > Text Modes`,
+
+      'showcase-right.flow': `// FlowScript Showcase (Left-to-Right)
+// Same showcase in right direction
+direction right
+
+// === SHAPES ===
+Shapes [color: blue] {
+  Rectangle
+  Oval [shape: oval]
+  Diamond [shape: diamond]
+  Cylinder [shape: cylinder]
+  Parallelogram [shape: parallelogram]
+  Hexagon [shape: hexagon]
+  Trapezoid [shape: trapezoid]
+  Triangle [shape: triangle]
+  Document [shape: document]
+  Ellipse [shape: ellipse]
+  Star [shape: star]
+}
+
+// === COLORS ===
+Colors [color: gray] {
+  Red [color: red]
+  Green [color: green]
+  Blue [color: blue]
+  Yellow [color: yellow]
+  Purple [color: purple]
+  Orange [color: orange]
+  Pink [color: pink]
+  Cyan [color: cyan]
+  Teal [color: teal]
+  Amber [color: amber]
+}
+
+// === ICONS (from 5000+ Tabler Icons) ===
+Icons [color: purple] {
+  Rocket [icon: rocket, color: red]
+  User [icon: user, color: blue]
+  Database [icon: database, color: green]
+  Shield [icon: shield-check, color: yellow]
+  CPU [icon: cpu, color: orange]
+}
+
+// === TEXT MODES ===
+Text Modes [color: teal] {
+  Wrap mode is the default [label: Wrap mode is the default text mode]
+  Fit [text: fit, label: This is fit mode shrinking to one line]
+  Clip [text: clip, label: This is clip mode truncating long text with ellipsis]
+}
+
+// === CONNECTIONS ===
+Rectangle > Oval
+Oval > Diamond : labeled arrow
+Diamond > Cylinder
+Cylinder > Parallelogram
+Parallelogram > Hexagon
+Hexagon > Trapezoid
+Trapezoid > Triangle
+Triangle > Document
+Document > Ellipse
+Ellipse > Star
+
+// Solid line (no arrow)
+Red - Green
+
+// Dotted line
+Blue -- Yellow
+
+// Dotted arrow
+Purple --> Orange
+
+// Bidirectional
+Pink <> Cyan
+
+// Reverse arrow
+Amber < Teal
+
+// Group connections
+Shapes > Colors : solid arrow
+Colors > Icons
+Icons > Text Modes`,
 
       'order-process.flow': `// E-Commerce Order Process
 
