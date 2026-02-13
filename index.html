@@ -789,12 +789,12 @@
           FlowScript
           <span id="appVersion" style="font-size: 10px; color: var(--text-muted); font-weight: 400; margin-left: 6px;">v0.11.2</span>
         </div>
-        <div class="project-name" id="projectName">
+        <div class="project-name" id="projectName" style="display:none;">
           <span id="projectLabel">No project open</span>
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn" id="openFolderHeaderBtn" title="Open project folder (Ctrl+O)">
+        <button class="btn" id="openFolderHeaderBtn" title="Open project folder (Ctrl+O)" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
           </svg>
@@ -821,7 +821,7 @@
 
     <div class="main" id="mainContent">
       <!-- No Project State -->
-      <div class="no-project" id="noProjectState">
+      <div class="no-project" id="noProjectState" style="display:none;">
         <div class="no-project-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
             <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
@@ -847,12 +847,11 @@
         <div class="sidebar-header">
           <span class="sidebar-title">Files</span>
           <div class="sidebar-actions">
-            <button class="sidebar-btn" id="openFolderSidebarBtn" title="Open folder">
+            <button class="sidebar-btn" id="openFolderSidebarBtn" title="Open folder" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
               </svg>
             </button>
-            <div style="width: 1px; height: 16px; background: var(--border); margin: 0 2px;"></div>
             <button class="sidebar-btn active" id="sortNameBtn" data-sort="name" title="Sort by name">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 6h12M3 12h9M3 18h6M18 6v12M15 15l3 3 3-3"/>
@@ -1075,8 +1074,7 @@ direction bottom  // alias for up</pre>
       <div class="help-section">
         <h3>Keyboard Shortcuts</h3>
         <pre>Ctrl+S          Save version (with comment)
-Ctrl+N          New file
-Ctrl+O          Open folder</pre>
+Ctrl+N          New file</pre>
       </div>
 
       <div class="help-section">
@@ -4170,7 +4168,7 @@ Process > End`;
         statusDot.classList.add('modified');
         statusDot.classList.remove('error');
       } else {
-        saveStatus.textContent = state.demoMode ? 'Demo mode' : 'Saved';
+        saveStatus.textContent = 'Saved';
         statusDot.classList.remove('modified', 'error');
       }
     };
