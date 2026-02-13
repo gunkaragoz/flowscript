@@ -1091,10 +1091,12 @@ Or hex: Node [color: #3b82f6]</pre>
 
       <div class="help-section">
         <h3>Direction</h3>
-        <pre>direction down    // default
-direction up
+        <pre>direction down    // default (top-to-bottom)
+direction up      // bottom-to-top
 direction right
-direction left</pre>
+direction left
+direction top     // alias for down
+direction bottom  // alias for up</pre>
       </div>
 
       <div class="help-section">
@@ -1929,8 +1931,12 @@ Process > End`;
       parseTokens(tokens, nodes, edges, groups, groupNames, null);
       
       // Extract direction from source
-      const dirMatch = source.match(/direction\s+(down|up|left|right)/i);
-      if (dirMatch) direction = dirMatch[1].toLowerCase();
+      const dirMatch = source.match(/direction\s+(down|up|left|right|top|bottom)/i);
+      if (dirMatch) {
+        const d = dirMatch[1].toLowerCase();
+        // Aliases: top = down (top-to-bottom), bottom = up (bottom-to-top)
+        direction = d === 'top' ? 'down' : d === 'bottom' ? 'up' : d;
+      }
 
       return { nodes: Array.from(nodes.values()), edges, groups, groupNames, direction };
     }
@@ -2295,13 +2301,419 @@ Process > End`;
       });
 
       const autoNodes = parsed.nodes.filter(n => !n.position);
-      const ungrouped = autoNodes.filter(n => !nodeToGroup.has(n.id));
 
+      // Detect if any group has re-entrant flows (chain leaves and re-enters same group).
+      // This requires flat layout; otherwise hierarchical ELK groups work fine.
+      const hasReentrantFlows = (() => {
+        const groupEntries = new Map(); // groupIdx -> Set of nodes that have incoming cross-group edges
+        const groupExits = new Map();   // groupIdx -> Set of nodes that have outgoing cross-group edges
+        parsed.edges.forEach(e => {
+          if (e.sourceIsGroup || e.targetIsGroup) return;
+          const sGroup = nodeToGroup.get(e.source);
+          const tGroup = nodeToGroup.get(e.target);
+          if (sGroup !== undefined && tGroup !== undefined && sGroup !== tGroup) {
+            if (!groupExits.has(sGroup)) groupExits.set(sGroup, new Set());
+            groupExits.get(sGroup).add(e.source);
+            if (!groupEntries.has(tGroup)) groupEntries.set(tGroup, new Set());
+            groupEntries.get(tGroup).add(e.target);
+          }
+        });
+        // A group is re-entrant if it has BOTH exits and entries
+        for (const [gIdx] of groupExits) {
+          if (groupEntries.has(gIdx)) return true;
+        }
+        return false;
+      })();
+
+      // Map direction to ELK direction
+      const directionMap = {
+        down: 'DOWN',
+        up: 'UP',
+        right: 'RIGHT',
+        left: 'LEFT'
+      };
+      const elkDirection = directionMap[parsed.direction] || 'DOWN';
+
+      parsed._dummyEdgeIds = new Set();
+
+      if (hasReentrantFlows) {
+        return await layoutFlat(parsed, autoNodes, nodeToGroup, groupNameToIdx, elkDirection);
+      } else {
+        return await layoutHierarchical(parsed, autoNodes, nodeToGroup, groupNameToIdx, elkDirection);
+      }
+    }
+
+    // Side-by-side layout for re-entrant group flows.
+    // Layouts each group independently, then positions satellite groups beside the
+    // primary (re-entrant) group, aligned vertically with their connection points.
+    async function layoutFlat(parsed, autoNodes, nodeToGroup, groupNameToIdx, elkDirection) {
+      const groupPadding = { top: 35, left: 15, bottom: 15, right: 15 };
+      const groupSpacing = 40;
+
+      // Identify the primary group (the one with both exits and entries)
+      const groupExitNodes = new Map();  // groupIdx -> [nodeId]
+      const groupEntryNodes = new Map(); // groupIdx -> [nodeId]
+      parsed.edges.forEach(e => {
+        if (e.sourceIsGroup || e.targetIsGroup) return;
+        const sGroup = nodeToGroup.get(e.source);
+        const tGroup = nodeToGroup.get(e.target);
+        if (sGroup !== undefined && tGroup !== undefined && sGroup !== tGroup) {
+          if (!groupExitNodes.has(sGroup)) groupExitNodes.set(sGroup, []);
+          groupExitNodes.get(sGroup).push(e.source);
+          if (!groupEntryNodes.has(tGroup)) groupEntryNodes.set(tGroup, []);
+          groupEntryNodes.get(tGroup).push(e.target);
+        }
+      });
+
+      let primaryGroupIdx = -1;
+      for (const [gIdx] of groupExitNodes) {
+        if (groupEntryNodes.has(gIdx)) { primaryGroupIdx = gIdx; break; }
+      }
+
+      // Trace re-entry: for an exit node, follow the chain until we re-enter the same group
+      function traceReentry(exitNode, exitGroup) {
+        let current = exitNode;
+        const visited = new Set();
+        while (true) {
+          visited.add(current);
+          const nextEdge = parsed.edges.find(e => e.source === current && !visited.has(e.target));
+          if (!nextEdge) return null;
+          const nextGroup = nodeToGroup.get(nextEdge.target);
+          if (nextGroup === exitGroup) return nextEdge.target;
+          current = nextEdge.target;
+          if (visited.size > 100) return null;
+        }
+      }
+
+      // Layout primary group internally with dummy ordering edges
+      const primaryNodes = autoNodes.filter(n => nodeToGroup.get(n.id) === primaryGroupIdx);
+      const primaryEdges = parsed.edges
+        .filter(e => nodeToGroup.get(e.source) === primaryGroupIdx && nodeToGroup.get(e.target) === primaryGroupIdx && !e.sourceIsGroup && !e.targetIsGroup);
+
+      // Add dummy ordering edges for chain continuity within the primary group
+      const dummyEdges = [];
+      if (groupExitNodes.has(primaryGroupIdx)) {
+        for (const exitNode of groupExitNodes.get(primaryGroupIdx)) {
+          const reentry = traceReentry(exitNode, primaryGroupIdx);
+          if (reentry) dummyEdges.push({ source: exitNode, target: reentry });
+        }
+      }
+
+      const primaryElkEdges = primaryEdges.map((e, i) => ({
+        id: `pe_${i}`,
+        sources: [e.source],
+        targets: [e.target],
+        labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
+      }));
+      dummyEdges.forEach((d, i) => {
+        const edgeId = `__dummy_p_${i}`;
+        parsed._dummyEdgeIds.add(edgeId);
+        primaryElkEdges.push({ id: edgeId, sources: [d.source], targets: [d.target] });
+      });
+
+      const primaryResult = await elk.layout({
+        id: 'primary',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': elkDirection,
+          'elk.spacing.nodeNode': '30',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+          'elk.edgeRouting': 'ORTHOGONAL',
+          'elk.edgeLabels.placement': 'CENTER',
+          'elk.edgeLabels.inline': 'true',
+          'elk.spacing.edgeLabel': '2',
+          'elk.spacing.edgeNode': '5',
+          'elk.spacing.labelNode': '2'
+        },
+        children: primaryNodes.map(n => createElkNode(n)),
+        edges: primaryElkEdges
+      });
+
+      // Build a map of node positions within the primary group (relative to group origin)
+      const primaryNodePos = new Map();
+      (primaryResult.children || []).forEach(c => {
+        primaryNodePos.set(c.id, { x: c.x, y: c.y, width: c.width, height: c.height });
+      });
+
+      // Layout each satellite group independently
+      const satelliteResults = new Map(); // groupIdx -> elkResult
+      for (const [gIdx, group] of parsed.groups.entries()) {
+        if (gIdx === primaryGroupIdx) continue;
+        const nodes = autoNodes.filter(n => nodeToGroup.get(n.id) === gIdx);
+        if (!nodes.length) continue;
+        const edges = parsed.edges
+          .filter(e => nodeToGroup.get(e.source) === gIdx && nodeToGroup.get(e.target) === gIdx && !e.sourceIsGroup && !e.targetIsGroup);
+        const satResult = await elk.layout({
+          id: `sat_${gIdx}`,
+          layoutOptions: {
+            'elk.algorithm': 'layered',
+            'elk.direction': elkDirection,
+            'elk.spacing.nodeNode': '30',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+            'elk.edgeRouting': 'ORTHOGONAL',
+            'elk.edgeLabels.placement': 'CENTER',
+            'elk.edgeLabels.inline': 'true',
+            'elk.spacing.edgeLabel': '2',
+            'elk.spacing.edgeNode': '5',
+            'elk.spacing.labelNode': '2'
+          },
+          children: nodes.map(n => createElkNode(n)),
+          edges: edges.map((e, i) => ({
+            id: `se_${gIdx}_${i}`,
+            sources: [e.source],
+            targets: [e.target],
+            labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
+          }))
+        });
+        satelliteResults.set(gIdx, satResult);
+      }
+
+      // Position groups: primary group on the left, satellite groups to the right
+      // Satellite groups are vertically aligned with the exit node in the primary group
+      const primaryGx = groupPadding.left;
+      const primaryGy = groupPadding.top;
+      const primaryWidth = primaryResult.width || 200;
+      const primaryHeight = primaryResult.height || 200;
+
+      // For each satellite group, find the vertical position of the exit node that connects to it
+      // Then resolve overlaps so groups don't stack on top of each other
+      const satellitePositions = new Map(); // groupIdx -> { x, y }
+
+      // Collect satellite info in edge order (preserves top-to-bottom flow)
+      const satelliteOrder = [];
+      parsed.edges.forEach(e => {
+        if (e.sourceIsGroup || e.targetIsGroup) return;
+        const sGroup = nodeToGroup.get(e.source);
+        const tGroup = nodeToGroup.get(e.target);
+        if (sGroup === primaryGroupIdx && tGroup !== undefined && tGroup !== primaryGroupIdx) {
+          if (satellitePositions.has(tGroup)) return; // already seen
+          const exitNodePos = primaryNodePos.get(e.source);
+          if (!exitNodePos) return;
+          const satResult = satelliteResults.get(tGroup);
+          if (!satResult) return;
+          const satWidth = satResult.width || 200;
+          const satHeight = satResult.height || 200;
+          const totalH = satHeight + groupPadding.top + groupPadding.bottom;
+
+          // Ideal position: center satellite on the exit node
+          const sx = primaryGx + primaryWidth + groupPadding.left + groupPadding.right + groupSpacing;
+          const idealY = primaryGy + exitNodePos.y + groupPadding.top + exitNodePos.height / 2 - totalH / 2;
+
+          satelliteOrder.push({ gIdx: tGroup, x: sx, idealY, height: totalH });
+          satellitePositions.set(tGroup, true); // mark as seen
+        }
+      });
+
+      // Resolve overlaps: push each satellite down if it overlaps the previous one
+      // Use consistent spacing between groups
+      let prevBottom = -Infinity;
+      for (const sat of satelliteOrder) {
+        let y = sat.idealY;
+        if (y < prevBottom + groupSpacing) {
+          y = prevBottom + groupSpacing;
+        }
+        satellitePositions.set(sat.gIdx, { x: sat.x, y });
+        prevBottom = y + sat.height;
+      }
+
+      // Build the combined result in ELK format expected by the renderer
+      const allChildren = [];
+
+      // Primary group container
+      const primaryRebasedChildren = (primaryResult.children || []).map(c => ({
+        ...c,
+        x: c.x,
+        y: c.y
+      }));
+      // Primary group internal edges (for the renderer to draw)
+      const primaryGroupEdges = (primaryResult.edges || []).map(e => ({
+        ...e,
+        sections: (e.sections || []).map(s => ({
+          ...s
+        }))
+      }));
+
+      allChildren.push({
+        id: `__group_${primaryGroupIdx}`,
+        x: primaryGx,
+        y: primaryGy,
+        width: primaryWidth + groupPadding.left + groupPadding.right,
+        height: primaryHeight + groupPadding.top + groupPadding.bottom,
+        children: primaryRebasedChildren.map(c => ({
+          ...c,
+          x: c.x + groupPadding.left,
+          y: c.y + groupPadding.top
+        })),
+        edges: primaryGroupEdges.map(e => ({
+          ...e,
+          sections: (e.sections || []).map(s => ({
+            startPoint: { x: s.startPoint.x + groupPadding.left, y: s.startPoint.y + groupPadding.top },
+            endPoint: { x: s.endPoint.x + groupPadding.left, y: s.endPoint.y + groupPadding.top },
+            bendPoints: (s.bendPoints || []).map(b => ({ x: b.x + groupPadding.left, y: b.y + groupPadding.top }))
+          })),
+          labels: (e.labels || []).map(l => l.x !== undefined ? { ...l, x: l.x + groupPadding.left, y: l.y + groupPadding.top } : l)
+        }))
+      });
+
+      // Satellite group containers
+      for (const [gIdx, satResult] of satelliteResults) {
+        const pos = satellitePositions.get(gIdx) || { x: primaryGx + primaryWidth + groupSpacing + 50, y: 0 };
+        const satWidth = satResult.width || 200;
+        const satHeight = satResult.height || 200;
+        const satRebasedChildren = (satResult.children || []).map(c => ({
+          ...c,
+          x: c.x + groupPadding.left,
+          y: c.y + groupPadding.top
+        }));
+        const satGroupEdges = (satResult.edges || []).map(e => ({
+          ...e,
+          sections: (e.sections || []).map(s => ({
+            startPoint: { x: s.startPoint.x + groupPadding.left, y: s.startPoint.y + groupPadding.top },
+            endPoint: { x: s.endPoint.x + groupPadding.left, y: s.endPoint.y + groupPadding.top },
+            bendPoints: (s.bendPoints || []).map(b => ({ x: b.x + groupPadding.left, y: b.y + groupPadding.top }))
+          })),
+          labels: (e.labels || []).map(l => l.x !== undefined ? { ...l, x: l.x + groupPadding.left, y: l.y + groupPadding.top } : l)
+        }));
+        allChildren.push({
+          id: `__group_${gIdx}`,
+          x: pos.x,
+          y: pos.y,
+          width: satWidth + groupPadding.left + groupPadding.right,
+          height: satHeight + groupPadding.top + groupPadding.bottom,
+          children: satRebasedChildren,
+          edges: satGroupEdges
+        });
+      }
+
+      // Build cross-group edges with smart port selection:
+      // - Outputs leave from bottom or right side of the source node
+      // - Inputs enter from top or left side of the target node
+      const crossGroupEdges = [];
+      parsed.edges.forEach((e, i) => {
+        if (e.sourceIsGroup || e.targetIsGroup) return;
+        const sGroup = nodeToGroup.get(e.source);
+        const tGroup = nodeToGroup.get(e.target);
+        if (sGroup !== undefined && tGroup !== undefined && sGroup !== tGroup) {
+          // Find source and target node absolute positions
+          let srcPos = null, tgtPos = null;
+          allChildren.forEach(gc => {
+            (gc.children || []).forEach(c => {
+              if (c.id === e.source) srcPos = { x: c.x + gc.x, y: c.y + gc.y, w: c.width, h: c.height };
+              if (c.id === e.target) tgtPos = { x: c.x + gc.x, y: c.y + gc.y, w: c.width, h: c.height };
+            });
+          });
+          if (srcPos && tgtPos) {
+            const srcCenterX = srcPos.x + srcPos.w / 2;
+            const srcCenterY = srcPos.y + srcPos.h / 2;
+            const tgtCenterX = tgtPos.x + tgtPos.w / 2;
+            const tgtCenterY = tgtPos.y + tgtPos.h / 2;
+
+            const targetIsRight = tgtCenterX > srcCenterX + srcPos.w / 2;
+            const targetIsLeft = tgtCenterX < srcCenterX - srcPos.w / 2;
+
+            let startPoint, endPoint, bendPoints;
+
+            // Gap between the last bend and the target top for a clean vertical entry
+            const entryGap = 20;
+
+            if (targetIsRight) {
+              // Source exits from RIGHT side, target enters from TOP
+              startPoint = { x: srcPos.x + srcPos.w, y: srcCenterY };
+              endPoint = { x: tgtCenterX, y: tgtPos.y };
+
+              if (startPoint.y <= endPoint.y - entryGap) {
+                // Source is above target: go right to tgtCenterX, then straight down
+                bendPoints = [
+                  { x: tgtCenterX, y: startPoint.y }
+                ];
+              } else {
+                // Source is at same level or below target: go right past target, up, then over and down
+                const aboveY = endPoint.y - entryGap;
+                const midX = (startPoint.x + tgtCenterX) / 2;
+                bendPoints = [
+                  { x: midX, y: startPoint.y },
+                  { x: midX, y: aboveY },
+                  { x: tgtCenterX, y: aboveY }
+                ];
+              }
+            } else if (targetIsLeft) {
+              // Source exits from LEFT side, target enters from TOP
+              startPoint = { x: srcPos.x, y: srcCenterY };
+              endPoint = { x: tgtCenterX, y: tgtPos.y };
+
+              if (startPoint.y <= endPoint.y - entryGap) {
+                // Source is above target: go left to tgtCenterX, then straight down
+                bendPoints = [
+                  { x: tgtCenterX, y: startPoint.y }
+                ];
+              } else {
+                // Source is at same level or below target: go left past target, up, then over and down
+                const aboveY = endPoint.y - entryGap;
+                const midX = (startPoint.x + tgtCenterX) / 2;
+                bendPoints = [
+                  { x: midX, y: startPoint.y },
+                  { x: midX, y: aboveY },
+                  { x: tgtCenterX, y: aboveY }
+                ];
+              }
+            } else {
+              // Target is roughly below/above — use bottom/top ports
+              startPoint = { x: srcCenterX, y: srcPos.y + srcPos.h };
+              endPoint = { x: tgtCenterX, y: tgtPos.y };
+              if (Math.abs(srcCenterX - tgtCenterX) > 5) {
+                const midY = (startPoint.y + endPoint.y) / 2;
+                bendPoints = [
+                  { x: startPoint.x, y: midY },
+                  { x: endPoint.x, y: midY }
+                ];
+              } else {
+                bendPoints = [];
+              }
+            }
+
+            // Place label on the first segment of the edge path (between start and first bend)
+            let labelX, labelY;
+            if (bendPoints.length > 0) {
+              labelX = (startPoint.x + bendPoints[0].x) / 2;
+              labelY = (startPoint.y + bendPoints[0].y) / 2;
+            } else {
+              labelX = (startPoint.x + endPoint.x) / 2;
+              labelY = (startPoint.y + endPoint.y) / 2;
+            }
+
+            crossGroupEdges.push({
+              id: `cross_${i}`,
+              sources: [e.source],
+              targets: [e.target],
+              sections: [{
+                startPoint,
+                endPoint,
+                bendPoints
+              }],
+              labels: e.label ? [{ ...calculateEdgeLabelDimensions(e.label), x: labelX, y: labelY }] : []
+            });
+          }
+        }
+      });
+
+      // Mark flat layout
+      parsed._flatLayout = true;
+
+      return {
+        id: 'root',
+        children: allChildren,
+        edges: crossGroupEdges
+      };
+    }
+
+    // Hierarchical layout: nodes nested inside ELK group containers.
+    // Works well when groups don't have re-entrant flows.
+    async function layoutHierarchical(parsed, autoNodes, nodeToGroup, groupNameToIdx, elkDirection) {
+      const ungrouped = autoNodes.filter(n => !nodeToGroup.has(n.id));
       const elkChildren = ungrouped.map(n => createElkNode(n));
 
       parsed.groups.forEach((group, idx) => {
         const children = autoNodes.filter(n => nodeToGroup.get(n.id) === idx);
-        // Add group even if empty (for group-to-group connections)
         elkChildren.push({
           id: `__group_${idx}`,
           layoutOptions: { 'elk.padding': '[top=35,left=15,bottom=15,right=15]' },
@@ -2333,15 +2745,6 @@ Process > End`;
           labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
         });
       });
-
-      // Map direction to ELK direction
-      const directionMap = {
-        down: 'DOWN',
-        up: 'UP',
-        right: 'RIGHT',
-        left: 'LEFT'
-      };
-      const elkDirection = directionMap[parsed.direction] || 'DOWN';
 
       const elkGraph = {
         id: 'root',
@@ -2404,8 +2807,8 @@ Process > End`;
 
       const maxWidth = 80; // Max width for edge labels (tighter)
       const charWidth = 6; // Character width for font size 10
-      const lineHeight = 12; // Tighter line height
-      const padding = 3; // Smaller padding
+      const lineHeight = 11; // Tighter line height
+      const padding = 1; // Minimal padding
 
       const lines = wrapText(labelText, maxWidth);
       const width = Math.max(...lines.map(l => l.length * charWidth)) + padding * 2;
@@ -2512,8 +2915,10 @@ Process > End`;
       // Edges
       const posMap = new Map(positioned.map(p => [p.id, { x: p.x + ox, y: p.y + oy, w: p.width, h: p.height }]));
 
+      const dummyEdgeIds = parsed._dummyEdgeIds || new Set();
       function drawEdges(edges, bx = 0, by = 0) {
         (edges || []).forEach(e => {
+          if (dummyEdgeIds.has(e.id)) return; // Skip invisible ordering edges
           if (e.sections) {
             e.sections.forEach(s => {
               let d = `M ${s.startPoint.x + ox + bx} ${s.startPoint.y + oy + by}`;
@@ -2523,8 +2928,34 @@ Process > End`;
             });
             (e.labels || []).forEach(l => {
               if (l.x !== undefined && l.text) {
-                const lx = l.x + ox + bx;
-                const ly = l.y + oy + by;
+                let lx = l.x + ox + bx;
+                let ly = l.y + oy + by;
+
+                // Snap label to the edge path midpoint for better placement
+                if (e.sections && e.sections.length > 0) {
+                  const s = e.sections[0];
+                  const sp = { x: s.startPoint.x + ox + bx, y: s.startPoint.y + oy + by };
+                  const ep = { x: s.endPoint.x + ox + bx, y: s.endPoint.y + oy + by };
+                  const bps = (s.bendPoints || []).map(b => ({ x: b.x + ox + bx, y: b.y + oy + by }));
+                  // Build full point list
+                  const pts = [sp, ...bps, ep];
+                  // Find the midpoint along the path
+                  let totalLen = 0;
+                  for (let pi = 1; pi < pts.length; pi++) {
+                    totalLen += Math.hypot(pts[pi].x - pts[pi-1].x, pts[pi].y - pts[pi-1].y);
+                  }
+                  let halfLen = totalLen / 2;
+                  for (let pi = 1; pi < pts.length; pi++) {
+                    const segLen = Math.hypot(pts[pi].x - pts[pi-1].x, pts[pi].y - pts[pi-1].y);
+                    if (halfLen <= segLen) {
+                      const t = segLen > 0 ? halfLen / segLen : 0;
+                      lx = pts[pi-1].x + t * (pts[pi].x - pts[pi-1].x);
+                      ly = pts[pi-1].y + t * (pts[pi].y - pts[pi-1].y);
+                      break;
+                    }
+                    halfLen -= segLen;
+                  }
+                }
 
                 // Eraser.io style: simple text on edge, minimal background
                 const fontSize = 10;
