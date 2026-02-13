@@ -2571,7 +2571,7 @@ Process > End`;
           'elk.algorithm': 'layered',
           'elk.direction': elkDirection,
           'elk.spacing.nodeNode': '30',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '40',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '28',
           'elk.edgeRouting': 'ORTHOGONAL',
           'elk.edgeLabels.placement': 'CENTER',
           'elk.edgeLabels.inline': 'true',
@@ -2603,7 +2603,7 @@ Process > End`;
             'elk.algorithm': 'layered',
             'elk.direction': elkDirection,
             'elk.spacing.nodeNode': '30',
-            'elk.layered.spacing.nodeNodeBetweenLayers': '30',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '20',
             'elk.edgeRouting': 'ORTHOGONAL',
             'elk.edgeLabels.placement': 'CENTER',
             'elk.edgeLabels.inline': 'true',
@@ -2918,7 +2918,7 @@ Process > End`;
           'elk.algorithm': 'layered',
           'elk.direction': elkDirection,
           'elk.spacing.nodeNode': '40',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '50',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '35',
           'elk.layered.spacing.edgeNodeBetweenLayers': '15',
           'elk.edgeRouting': 'ORTHOGONAL',
           'elk.hierarchyHandling': 'INCLUDE_CHILDREN',
@@ -3068,8 +3068,8 @@ Process > End`;
 
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
       svg += `<defs>`;
-      svg += `<marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="${edgeStroke}"/></marker>`;
-      svg += `<marker id="arrow-rev" markerWidth="8" markerHeight="6" refX="1" refY="3" orient="auto"><polygon points="8 0,0 3,8 6" fill="${edgeStroke}"/></marker>`;
+      svg += `<marker id="arrow" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${edgeStroke}"/></marker>`;
+      svg += `<marker id="arrow-rev" markerWidth="6" markerHeight="4" refX="1" refY="2" orient="auto"><polygon points="6 0,0 2,6 4" fill="${edgeStroke}"/></marker>`;
       svg += `</defs>`;
 
       // Groups
