@@ -4,26 +4,28 @@
 
 FlowScript is a browser-based flowchart editor that uses a clean text syntax to create beautiful diagrams. Work entirely offline with local file system access, automatic version history, and real-time rendering powered by ELK (Eclipse Layout Kernel).
 
-🔗 **Live Demo:** [https://gunkaragoz.github.io/flowscript/](https://gunkaragoz.github.io/flowscript/)
+Live at [fs.gnkz.net](https://fs.gnkz.net) | GitHub Pages: [gunkaragoz.github.io/flowscript](https://gunkaragoz.github.io/flowscript/)
 
 ---
 
-## ✨ Features
+## Features
 
-- 📝 **Text-based syntax** - Write flowcharts like code, see results instantly
-- 💾 **Local file system** - Direct folder access, your files stay on your machine
-- 📚 **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
-- 🎨 **Customizable** - Shapes, colors, icons, text modes, and more
-- 🌓 **Dark/Light themes** - Comfortable viewing in any environment
-- 📤 **Export** - Download diagrams as SVG or PNG
-- ⚡ **Auto-layout** - Powered by ELK for professional diagram layouts
-- 🔄 **Eraser.io compatible** - Supports familiar syntax conventions
+- **Text-based syntax** - Write flowcharts like code, see results instantly
+- **5000+ icons** - Full [Tabler Icons](https://tabler-icons.io) library loaded from CDN
+- **Dual layout engine** - Smart layout for standard and re-entrant (cross-group) flows
+- **Local file system** - Direct folder access, your files stay on your machine
+- **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
+- **Customizable** - 11 shapes, 20+ colors, text modes, and more
+- **Dark/Light themes** - Comfortable viewing in any environment
+- **Export** - Download diagrams as SVG or PNG
+- **Auto-layout** - Powered by ELK for professional diagram layouts
+- **Eraser.io compatible** - Supports familiar syntax conventions
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-1. Open [FlowScript](https://gunkaragoz.github.io/flowscript/)
+1. Open [FlowScript](https://fs.gnkz.net)
 2. Click **"Open Folder"** to select a local directory
 3. Create a new `.flow` file
 4. Start writing your flowchart using the syntax below
@@ -47,7 +49,7 @@ Save to DB > End
 
 ---
 
-## 📖 Syntax Guide
+## Syntax Guide
 
 ### Node Definitions
 
@@ -63,7 +65,7 @@ Node Name [shape: rectangle, color: blue, icon: server, text: wrap]
 |----------|--------|-------------|
 | `shape` | See shapes table below | Node shape |
 | `color` | Named colors or hex codes | Node fill color |
-| `icon` | See icons list below | Icon to display in node |
+| `icon` | Any [Tabler icon](https://tabler-icons.io) name | Icon to display in node |
 | `text` | `wrap`, `fit`, `clip` | Text rendering mode |
 | `label` | Any string | Custom label (different from node ID) |
 
@@ -87,6 +89,8 @@ Node Name [shape: rectangle, color: blue, icon: server, text: wrap]
 
 `red`, `green`, `blue`, `yellow`, `purple`, `orange`, `pink`, `cyan`, `gray`, `brown`, `black`, `white`
 
+Extended: `light-red`, `light-green`, `light-blue`, `light-yellow`, `light-purple`, `light-orange`
+
 Or use hex codes: `#3b82f6`
 
 **Text Modes:**
@@ -97,9 +101,22 @@ Short [text: fit]           // fit - shrinks font to fit in one line
 Very Long Name [text: clip] // clip - truncates with ellipsis
 ```
 
-**Available Icons:**
+**Icons (5000+ Tabler Icons):**
 
-`server`, `database`, `api`, `cache`, `postgresql`, `user`, `lock`, `mail`, `globe`, `code`, `check`, `x`, `alert`, `aws-lambda`, `dynamodb`, `docker`
+Use any icon name from the [Tabler Icons](https://tabler-icons.io) library:
+
+```
+Server [icon: server]
+GitHub [icon: brand-github]
+AWS Lambda [icon: brand-aws]
+Rocket [icon: rocket]
+Fingerprint [icon: fingerprint]
+Camera [icon: camera]
+```
+
+Common icons: `user`, `database`, `server`, `api`, `code`, `lock`, `mail`, `cloud`, `docker`, `check`, `x`, `alert`, `download`, `upload`, `globe`, `star`, `heart`, `settings`
+
+Browse all icons at [tabler-icons.io](https://tabler-icons.io).
 
 ---
 
@@ -139,6 +156,23 @@ Group Name > Another Group : API calls
 
 Groups support the same `color` property as nodes.
 
+**Cross-group flows:** FlowScript automatically handles flows that alternate between groups (e.g., orchestrator calling external services and receiving results back). Satellite groups are positioned beside the primary group, aligned with their connection points.
+
+---
+
+### Direction
+
+Control the flow direction:
+
+```
+direction down    // default (top-to-bottom)
+direction up      // bottom-to-top
+direction right   // left-to-right
+direction left    // right-to-left
+direction top     // alias for down
+direction bottom  // alias for up
+```
+
 ---
 
 ### Complete Example
@@ -172,9 +206,34 @@ Backend Services [color: purple] {
 }
 ```
 
+### Re-entrant Flow Example
+
+```
+// Pipeline that alternates between groups
+direction top
+
+Orchestrator [color: red] {
+  Step1 [label: Start Job]
+  Step2 [label: Process Result]
+  Step3 [label: Next Job]
+  Step4 [label: Final Result]
+}
+
+Worker [color: purple] {
+  TaskA [label: Run Task A]
+  TaskB [label: Run Task B]
+}
+
+Step1 > TaskA
+TaskA > Step2
+Step2 > Step3
+Step3 > TaskB
+TaskB > Step4
+```
+
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
@@ -184,7 +243,7 @@ Backend Services [color: purple] {
 
 ---
 
-## 📦 Version Management
+## Version Management
 
 ### Automatic Saves
 FlowScript auto-saves your work every 5 minutes to prevent data loss.
@@ -199,7 +258,7 @@ The app version is displayed in the header and updates automatically with each r
 
 ---
 
-## 🔧 Development & Versioning
+## Development & Versioning
 
 This project follows [Semantic Versioning](https://semver.org/) with automated version bumping:
 
@@ -227,7 +286,7 @@ The GitHub Actions workflow automatically:
 
 ---
 
-## 🎨 Best Practices
+## Best Practices
 
 ### 1. Node Naming
 **Do:**
@@ -269,7 +328,7 @@ Common label pairs: `yes/no`, `true/false`, `valid/invalid`, `success/failure`, 
 
 ### 4. Flow Direction
 
-- **Top-to-bottom** is standard
+- **Top-to-bottom** is standard (use `direction top` or `direction down`)
 - Start nodes at the top (no incoming edges)
 - End nodes at the bottom (no outgoing edges)
 - Loops can flow upward when necessary
@@ -281,10 +340,11 @@ Use groups for:
 - Service boundaries (AWS / GCP / Local)
 - Swim lanes (User / System / Admin)
 - Architectural layers
+- Cross-service pipelines (Orchestrator / Workers)
 
 ---
 
-## 📄 File Format
+## File Format
 
 FlowScript uses `.flow` files - plain text files that can be:
 - Edited in any text editor
@@ -303,7 +363,7 @@ my-project/
 
 ---
 
-## 🌐 Browser Compatibility
+## Browser Compatibility
 
 FlowScript requires the File System Access API, currently supported in:
 - Chrome/Edge 86+
@@ -314,27 +374,27 @@ Firefox support is planned pending File System Access API implementation.
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
-This is a personal project by [Gün](https://gnkz.net), but feedback and suggestions are welcome!
+This is a personal project by [Gun](https://gnkz.net), but feedback and suggestions are welcome!
 
 - **GitHub:** [github.com/gunkaragoz/flowscript](https://github.com/gunkaragoz/flowscript)
 - **Issues:** Report bugs or request features via GitHub Issues
 
 ---
 
-## 📝 License
+## License
 
 Personal project - feel free to use and learn from it.
 
 ---
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - Inspired by [Eraser.io](https://eraser.io)'s clean diagram syntax
 - Layout powered by [ELK (Eclipse Layout Kernel)](https://www.eclipse.org/elk/)
-- Icons and design patterns from modern UI conventions
+- Icons from [Tabler Icons](https://tabler-icons.io) (5000+ MIT-licensed SVG icons)
 
 ---
 
-**This is vibe-coded by [Gün](https://gnkz.net) with Claude Code**
+**This is vibe-coded by [Gun](https://gnkz.net) with Claude Code**

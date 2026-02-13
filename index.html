@@ -1010,54 +1010,27 @@ Frontend > Backend: REST API</pre>
       </div>
 
       <div class="help-section">
-        <h3>Icons (Tabler Icons)</h3>
-        <pre style="font-size: 10px; line-height: 1.4;">// Common
+        <h3>Icons (Tabler Icons - 5000+)</h3>
+        <pre style="font-size: 10px; line-height: 1.4;">// Use ANY icon from tabler-icons.io
+// Examples:
 user, users, settings, home, bell
-
-// Development
-code, terminal, git, bug
-
-// Infrastructure
+code, terminal, git, bug, brand-github
 server, database, cloud, api, network
-
-// Communication
-mail, message, phone, send
-
-// Files
-file, folder, download, upload
-
-// Status
+mail, message, phone, send, inbox
+file, folder, download, upload, clipboard
 check, x, alert, info, plus, minus
+lock, key, shield, fingerprint, eye
+photo, video, music, camera, microphone
+arrow-right, chevron, external, link
+clock, calendar, hourglass
+chart-bar, graph, trending-up
+shopping-cart, credit-card, currency-dollar
+world, location, map-pin, compass
+docker, brand-aws, cpu, device-mobile
+share, star, heart, bookmark, thumb-up
 
-// Security
-lock, key, shield
-
-// Media
-photo, video, music
-
-// Navigation
-arrow, chevron, external, link
-
-// Time
-clock, calendar
-
-// Charts
-chart, graph
-
-// Business
-shopping, credit, currency
-
-// Location
-world, location, map
-
-// Tech
-docker, brand, cpu
-
-// Social
-share, star, heart
-
-Usage: Node [icon: user]
-See: github.com/tabler/tabler-icons</pre>
+// Full library: tabler-icons.io
+Usage: Node [icon: brand-github]</pre>
       </div>
 
       <div class="help-section">
@@ -1441,6 +1414,38 @@ Ctrl+O          Open folder</pre>
       heart: 'M19.5 12.572l-7.5 7.428l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572',
     };
 
+    // Extended Tabler Icons library - loaded from CDN
+    // Provides access to 5000+ icons beyond the hardcoded set above
+    let tablerIconsDB = null; // Will be populated from CDN
+    const tablerIconsLoading = fetch('https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-nodes-outline.json')
+      .then(r => r.json())
+      .then(data => {
+        tablerIconsDB = data;
+        console.log(`Loaded ${Object.keys(data).length} Tabler icons from CDN`);
+      })
+      .catch(e => console.warn('Could not load extended Tabler icons:', e));
+
+    // Unified icon lookup: checks hardcoded first (instant), then Tabler DB
+    // Returns an array of SVG path strings for the icon, or null if not found
+    function getIconPaths(iconName) {
+      if (!iconName) return null;
+      // 1. Check hardcoded icons (single path string)
+      if (icons[iconName]) return [icons[iconName]];
+      // 2. Check Tabler DB (array of [tag, {d: ...}] entries)
+      if (tablerIconsDB && tablerIconsDB[iconName]) {
+        const paths = tablerIconsDB[iconName]
+          .filter(entry => entry[0] === 'path' && entry[1] && entry[1].d)
+          .filter(entry => entry[1].d !== 'M0 0h24v24H0z') // skip bounding box
+          .map(entry => entry[1].d);
+        if (paths.length > 0) return paths;
+      }
+      return null;
+    }
+
+    // Check if an icon name is valid (exists in either source)
+    function hasIcon(iconName) {
+      return getIconPaths(iconName) !== null;
+    }
 
     // Eraser-compatible shape mapping
     const shapeMap = {
@@ -2818,8 +2823,8 @@ Process > End`;
     }
 
     function createElkNode(node) {
-      const hasIcon = node.icon && icons[node.icon];
-      const iconSpace = hasIcon ? 24 : 0;
+      const nodeHasIcon = node.icon && hasIcon(node.icon);
+      const iconSpace = nodeHasIcon ? 24 : 0;
       const textMode = node.text || 'wrap'; // wrap, fit, clip
       
       let width, height;
@@ -2995,7 +3000,8 @@ Process > End`;
         if (!node) return;
         const x = p.x + ox, y = p.y + oy, w = p.width, h = p.height;
         const fill = node.color || nodeFill;
-        const hasIcon = node.icon && icons[node.icon];
+        const iconPaths = getIconPaths(node.icon);
+        const nodeHasIcon = iconPaths !== null;
         const textMode = node.text || 'wrap';
         const label = node.label || node.id;
 
@@ -3004,16 +3010,18 @@ Process > End`;
 
         svg += renderShape(node.shape, x, y, w, h, fill, nodeStroke);
 
-        // Icon
-        if (hasIcon) {
-          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="${icons[node.icon]}"/></svg></g>`;
+        // Icon (supports multi-path Tabler icons)
+        if (nodeHasIcon) {
+          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`;
+          iconPaths.forEach(d => { svg += `<path d="${d}"/>`; });
+          svg += `</svg></g>`;
         }
 
         // Text rendering based on mode
-        const iconSpace = hasIcon ? 24 : 0;
-        const textX = hasIcon ? x + 30 : x + TEXT_CONFIG.padding;
+        const iconSpace = nodeHasIcon ? 24 : 0;
+        const textX = nodeHasIcon ? x + 30 : x + TEXT_CONFIG.padding;
         const availableWidth = w - TEXT_CONFIG.padding * 2 - iconSpace;
-        const centerX = hasIcon ? x + 30 + (w - 30) / 2 : x + w / 2;
+        const centerX = nodeHasIcon ? x + 30 + (w - 30) / 2 : x + w / 2;
 
         if (textMode === 'fit') {
           // Fit mode: shrink font to fit in single line
@@ -3121,10 +3129,17 @@ Process > End`;
     // ============================================
 
     let updateTimer;
+    let tablerIconsReady = false;
     async function updateDiagram() {
       const source = editor.value;
 
       try {
+        // Wait for Tabler icons on first render (max 3s, then proceed without)
+        if (!tablerIconsReady) {
+          await Promise.race([tablerIconsLoading, new Promise(r => setTimeout(r, 3000))]);
+          tablerIconsReady = true;
+        }
+
         const parsed = parse(source);
         if (parsed.nodes.length === 0) {
           canvas.innerHTML = '';
