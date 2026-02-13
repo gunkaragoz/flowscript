@@ -2484,6 +2484,7 @@ Process > End`;
       const elkDirection = directionMap[parsed.direction] || 'DOWN';
 
       parsed._dummyEdgeIds = new Set();
+      parsed._edgeMeta = new Map(); // edgeId -> { connectorType, color }
 
       if (hasReentrantFlows) {
         return await layoutFlat(parsed, autoNodes, nodeToGroup, groupNameToIdx, elkDirection);
@@ -2548,12 +2549,16 @@ Process > End`;
         }
       }
 
-      const primaryElkEdges = primaryEdges.map((e, i) => ({
-        id: `pe_${i}`,
-        sources: [e.source],
-        targets: [e.target],
-        labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
-      }));
+      const primaryElkEdges = primaryEdges.map((e, i) => {
+        const edgeId = `pe_${i}`;
+        parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
+        return {
+          id: edgeId,
+          sources: [e.source],
+          targets: [e.target],
+          labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
+        };
+      });
       dummyEdges.forEach((d, i) => {
         const edgeId = `__dummy_p_${i}`;
         parsed._dummyEdgeIds.add(edgeId);
@@ -2607,12 +2612,16 @@ Process > End`;
             'elk.spacing.labelNode': '2'
           },
           children: nodes.map(n => createElkNode(n)),
-          edges: edges.map((e, i) => ({
-            id: `se_${gIdx}_${i}`,
-            sources: [e.source],
-            targets: [e.target],
-            labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
-          }))
+          edges: edges.map((e, i) => {
+            const edgeId = `se_${gIdx}_${i}`;
+            parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
+            return {
+              id: edgeId,
+              sources: [e.source],
+              targets: [e.target],
+              labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
+            };
+          })
         });
         satelliteResults.set(gIdx, satResult);
       }
@@ -2830,8 +2839,10 @@ Process > End`;
               labelY = (startPoint.y + endPoint.y) / 2;
             }
 
+            const crossEdgeId = `cross_${i}`;
+            parsed._edgeMeta.set(crossEdgeId, { connectorType: e.connectorType, color: e.color });
             crossGroupEdges.push({
-              id: `cross_${i}`,
+              id: crossEdgeId,
               sources: [e.source],
               targets: [e.target],
               sections: [{
@@ -2869,12 +2880,16 @@ Process > End`;
           children: children.map(n => createElkNode(n)),
           edges: parsed.edges
             .filter(e => nodeToGroup.get(e.source) === idx && nodeToGroup.get(e.target) === idx && !e.sourceIsGroup && !e.targetIsGroup)
-            .map((e, i) => ({
-              id: `ge_${idx}_${i}`,
-              sources: [e.source],
-              targets: [e.target],
-              labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
-            }))
+            .map((e, i) => {
+              const edgeId = `ge_${idx}_${i}`;
+              parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
+              return {
+                id: edgeId,
+                sources: [e.source],
+                targets: [e.target],
+                labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
+              };
+            })
         });
       });
 
@@ -2887,8 +2902,10 @@ Process > End`;
         let sourceId = e.sourceIsGroup ? `__group_${groupNameToIdx.get(e.source)}` : e.source;
         let targetId = e.targetIsGroup ? `__group_${groupNameToIdx.get(e.target)}` : e.target;
 
+        const edgeId = `e_${i}`;
+        parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
         elkEdges.push({
-          id: `e_${i}`,
+          id: edgeId,
           sources: [sourceId],
           targets: [targetId],
           labels: e.label ? [calculateEdgeLabelDimensions(e.label)] : []
@@ -3050,7 +3067,10 @@ Process > End`;
       const groupStroke = style.getPropertyValue('--group-stroke').trim();
 
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${width} ${height}">`;
-      svg += `<defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${edgeStroke}"/></marker></defs>`;
+      svg += `<defs>`;
+      svg += `<marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0,10 3.5,0 7" fill="${edgeStroke}"/></marker>`;
+      svg += `<marker id="arrow-rev" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto"><polygon points="10 0,0 3.5,10 7" fill="${edgeStroke}"/></marker>`;
+      svg += `</defs>`;
 
       // Groups
       groupRects.forEach(g => {
@@ -3065,15 +3085,34 @@ Process > End`;
       const posMap = new Map(positioned.map(p => [p.id, { x: p.x + ox, y: p.y + oy, w: p.width, h: p.height }]));
 
       const dummyEdgeIds = parsed._dummyEdgeIds || new Set();
+      const edgeMeta = parsed._edgeMeta || new Map();
       function drawEdges(edges, bx = 0, by = 0) {
         (edges || []).forEach(e => {
           if (dummyEdgeIds.has(e.id)) return; // Skip invisible ordering edges
+          const meta = edgeMeta.get(e.id) || {};
+          const ct = meta.connectorType || '>';
+          const eColor = meta.color || edgeStroke;
+          // Determine line style based on connector type
+          const isDotted = ct === '--' || ct === '-->';
+          const dashAttr = isDotted ? ' stroke-dasharray="6 3"' : '';
+          // Determine arrow markers
+          let markerStart = '';
+          let markerEnd = '';
+          if (ct === '>' || ct === '-->') {
+            markerEnd = ` marker-end="url(#arrow)"`;
+          } else if (ct === '<') {
+            markerStart = ` marker-start="url(#arrow-rev)"`;
+          } else if (ct === '<>') {
+            markerStart = ` marker-start="url(#arrow-rev)"`;
+            markerEnd = ` marker-end="url(#arrow)"`;
+          }
+          // '-' and '--' have no arrows
           if (e.sections) {
             e.sections.forEach(s => {
               let d = `M ${s.startPoint.x + ox + bx} ${s.startPoint.y + oy + by}`;
               (s.bendPoints || []).forEach(b => d += ` L ${b.x + ox + bx} ${b.y + oy + by}`);
               d += ` L ${s.endPoint.x + ox + bx} ${s.endPoint.y + oy + by}`;
-              svg += `<path d="${d}" fill="none" stroke="${edgeStroke}" stroke-width="1.5" marker-end="url(#arrow)"/>`;
+              svg += `<path d="${d}" fill="none" stroke="${eColor}" stroke-width="1.5"${dashAttr}${markerStart}${markerEnd}/>`;
             });
             (e.labels || []).forEach(l => {
               if (l.x !== undefined && l.text) {
