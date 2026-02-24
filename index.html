@@ -1533,12 +1533,15 @@ Ctrl+N          New file</pre>
       // 1. Check hardcoded icons (single path string, always outline)
       if (icons[iconName]) return { paths: [icons[iconName]], filled: false };
       // 2. Check filled DB first when name ends with -filled, otherwise outline first
-      const dbs = iconName.endsWith('-filled')
-        ? [{ db: tablerIconsFilledDB, filled: true }, { db: tablerIconsDB, filled: false }]
-        : [{ db: tablerIconsDB, filled: false }, { db: tablerIconsFilledDB, filled: true }];
-      for (const { db, filled } of dbs) {
-        if (db && db[iconName]) {
-          const paths = db[iconName]
+      // Note: filled DB keys don't include the "-filled" suffix (e.g. key is "heart" not "heart-filled")
+      const isFilled = iconName.endsWith('-filled');
+      const baseName = isFilled ? iconName.slice(0, -7) : iconName;
+      const dbs = isFilled
+        ? [{ db: tablerIconsFilledDB, key: baseName, filled: true }, { db: tablerIconsDB, key: iconName, filled: false }]
+        : [{ db: tablerIconsDB, key: iconName, filled: false }, { db: tablerIconsFilledDB, key: iconName, filled: true }];
+      for (const { db, key, filled } of dbs) {
+        if (db && db[key]) {
+          const paths = db[key]
             .filter(entry => entry[0] === 'path' && entry[1] && entry[1].d)
             .filter(entry => entry[1].d !== 'M0 0h24v24H0z') // skip bounding box
             .map(entry => entry[1].d);
