@@ -2113,15 +2113,15 @@ Process > End`;
         }
         
         // Check if this line starts a group (has { at end or followed by {)
-        if (trimmed.includes('{') && !trimmed.includes('>')) {
+        if (trimmed.includes('{') && !hasConnectorChar(trimmed)) {
           const result = parseGroupBlock(lines, i);
           tokens.push(result.token);
           i = result.nextIndex;
           continue;
         }
-        
+
         // Connection line
-        if (trimmed.includes('>') || trimmed.includes('<') || trimmed.match(/\s-\s/) || trimmed.includes('--')) {
+        if (hasConnectorChar(trimmed) || trimmed.match(/\s-\s/) || trimmed.includes('--')) {
           tokens.push({ type: 'connection', content: trimmed });
           i++;
           continue;
@@ -2258,6 +2258,41 @@ Process > End`;
       return props;
     }
 
+    function hasConnectorChar(text) {
+      // Returns true if text contains < or > outside of [...] brackets
+      let depth = 0;
+      for (let i = 0; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '[') depth++;
+        else if (ch === ']') depth--;
+        else if (depth === 0 && (ch === '>' || ch === '<')) return true;
+      }
+      return false;
+    }
+
+    function splitConnector(text, connector) {
+      // Split text by connector string, but only outside of [...] brackets
+      const parts = [];
+      let current = '';
+      let depth = 0;
+      const len = connector.length;
+      for (let i = 0; i < text.length; ) {
+        const ch = text[i];
+        if (ch === '[') depth++;
+        else if (ch === ']') depth--;
+        if (depth === 0 && text.slice(i, i + len) === connector) {
+          parts.push(current.trim());
+          current = '';
+          i += len;
+        } else {
+          current += ch;
+          i++;
+        }
+      }
+      parts.push(current.trim());
+      return parts;
+    }
+
     function splitOutsideBrackets(str, delimiter) {
       const result = [];
       let current = '';
@@ -2342,61 +2377,73 @@ Process > End`;
         text = text.replace(/\[[^\]]+\]\s*$/, '').trim();
       }
       
-      // Determine connector type and split
+      // Determine connector type using the definition part (before any label separator)
+      // so that < or > inside an edge label don't confuse connector detection
+      const firstColonIdx = text.indexOf(':');
+      const connDef = firstColonIdx >= 0 ? text.slice(0, firstColonIdx) : text;
+
       let connectorType = '>';
       let parts = [];
-      
-      if (text.includes('<>')) {
+
+      if (connDef.includes('<>')) {
         connectorType = '<>';
-        parts = text.split('<>').map(p => p.trim());
-      } else if (text.includes('-->')) {
+        parts = splitConnector(text, '<>');
+      } else if (connDef.includes('-->')) {
         connectorType = '-->';
-        parts = text.split('-->').map(p => p.trim());
-      } else if (text.includes('--')) {
+        parts = splitConnector(text, '-->');
+      } else if (connDef.includes('--')) {
         connectorType = '--';
-        parts = text.split('--').map(p => p.trim());
-      } else if (text.includes('<') && !text.includes('>')) {
+        parts = splitConnector(text, '--');
+      } else if (connDef.includes('<') && !connDef.includes('>')) {
         connectorType = '<';
-        parts = text.split('<').map(p => p.trim());
-      } else if (text.includes('>')) {
+        parts = splitConnector(text, '<');
+      } else if (connDef.includes('>')) {
         connectorType = '>';
-        parts = text.split('>').map(p => p.trim());
+        parts = splitConnector(text, '>');
       } else if (text.match(/\s-\s/)) {
         connectorType = '-';
         parts = text.split(/\s-\s/).map(p => p.trim());
       }
-      
+
       if (parts.length < 2) return;
-      
+
       // Process chained connections: A > B > C
-      for (let i = 0; i < parts.length - 1; i++) {
+      let stopProcessing = false;
+      for (let i = 0; i < parts.length - 1 && !stopProcessing; i++) {
         let sourcePart = parts[i];
         let targetPart = parts[i + 1];
-        
+
         // Source could have been created from previous iteration
         // Handle branching: A > B, C, D (only on last part)
         const targets = (i === parts.length - 2) ? splitOutsideBrackets(targetPart, ',') : [targetPart];
-        
+
         for (let target of targets) {
           let label = '';
-          
+
           // Extract label after colon: A > B: label
-          const colonMatch = target.match(/^(.+?):\s*(.+)$/);
+          const colonMatch = target.match(/^(.+?):\s*(.*)$/);
           if (colonMatch) {
             target = colonMatch[1].trim();
             label = colonMatch[2].trim();
+            // If there are more connector-split parts after this target, they belong to
+            // the label (e.g. "A > B: x > y" should give label "x > y", not a new node "y")
+            if (i + 2 < parts.length) {
+              const remaining = parts.slice(i + 2).join(connectorType);
+              label = label ? (label + connectorType + remaining) : remaining;
+              stopProcessing = true;
+            }
             // Remove any trailing properties from label
             label = label.replace(/\[[^\]]+\]$/, '').trim();
           }
-          
+
           // Clean source and target IDs
           const sourceId = extractNodeId(sourcePart);
           const targetId = extractNodeId(target);
-          
+
           // Ensure nodes exist
           const sourceIsGroup = groupNames.has(sourceId);
           const targetIsGroup = groupNames.has(targetId);
-          
+
           if (!sourceIsGroup && !nodes.has(sourceId)) {
             const node = parseNode(sourcePart);
             if (node) nodes.set(sourceId, node);
@@ -2405,13 +2452,13 @@ Process > End`;
             const node = parseNode(target);
             if (node) nodes.set(targetId, node);
           }
-          
+
           // Resolve edge color
           let edgeColor = null;
           if (edgeProps.color) {
             edgeColor = colorPalette[edgeProps.color] || edgeProps.color;
           }
-          
+
           edges.push({
             source: sourceId,
             target: targetId,
@@ -2422,7 +2469,7 @@ Process > End`;
             targetIsGroup
           });
         }
-        
+
         // For chained connections, use target as next source
         sourcePart = targets[0];
       }
