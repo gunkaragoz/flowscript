@@ -604,9 +604,21 @@
 
     /* Resize Handles */
     .resize-handle {
-      width: 3px;
+      width: 5px;
       background: transparent;
       cursor: col-resize;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
+    }
+
+    .resize-handle::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -3px;
+      right: -3px;
+      bottom: 0;
     }
 
     .resize-handle:hover {
@@ -3496,6 +3508,53 @@ Process > End`;
     document.getElementById('zoomInBtn').addEventListener('click', () => { state.zoom = Math.min(4, state.zoom * 1.2); applyTransform(); });
     document.getElementById('zoomOutBtn').addEventListener('click', () => { state.zoom = Math.max(0.1, state.zoom / 1.2); applyTransform(); });
     document.getElementById('fitBtn').addEventListener('click', () => { state.zoom = 1; state.pan = { x: 0, y: 0 }; applyTransform(); });
+
+    // ============================================
+    // Pane Resizing
+    // ============================================
+
+    (function() {
+      let isResizing = false;
+      let activeHandle = null;
+      let startX = 0;
+      let startWidth = 0;
+
+      const sidebarEl = document.getElementById('sidebar');
+      const editorPanelEl = document.getElementById('editorPanel');
+      const sidebarResizeEl = document.getElementById('sidebarResize');
+      const editorResizeEl = document.getElementById('editorResize');
+
+      function onResizeStart(e, handle) {
+        isResizing = true;
+        activeHandle = handle;
+        startX = e.clientX;
+        startWidth = (handle === 'sidebar' ? sidebarEl : editorPanelEl).getBoundingClientRect().width;
+        document.body.style.cursor = 'col-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+      }
+
+      sidebarResizeEl.addEventListener('mousedown', e => onResizeStart(e, 'sidebar'));
+      editorResizeEl.addEventListener('mousedown', e => onResizeStart(e, 'editor'));
+
+      document.addEventListener('mousemove', e => {
+        if (!isResizing) return;
+        const dx = e.clientX - startX;
+        if (activeHandle === 'sidebar') {
+          sidebarEl.style.width = Math.max(180, startWidth + dx) + 'px';
+        } else if (activeHandle === 'editor') {
+          editorPanelEl.style.width = Math.max(280, startWidth + dx) + 'px';
+        }
+      });
+
+      document.addEventListener('mouseup', () => {
+        if (!isResizing) return;
+        isResizing = false;
+        activeHandle = null;
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      });
+    })();
 
     // ============================================
     // Export
