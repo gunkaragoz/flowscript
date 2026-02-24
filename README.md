@@ -114,6 +114,15 @@ Fingerprint [icon: fingerprint]
 Camera [icon: camera]
 ```
 
+**Filled variants:** Append `-filled` to any icon name to use its filled version:
+
+```
+Heart [icon: heart-filled]
+Star [icon: star-filled]
+Bookmark [icon: bookmark-filled]
+Bell [icon: bell-filled]
+```
+
 Common icons: `user`, `database`, `server`, `api`, `code`, `lock`, `mail`, `cloud`, `docker`, `check`, `x`, `alert`, `download`, `upload`, `globe`, `star`, `heart`, `settings`
 
 Browse all icons at [tabler-icons.io](https://tabler-icons.io).
