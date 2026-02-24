@@ -1507,30 +1507,51 @@ Ctrl+N          New file</pre>
 
     // Extended Tabler Icons library - loaded from CDN
     // Provides access to 5000+ icons beyond the hardcoded set above
-    let tablerIconsDB = null; // Will be populated from CDN
-    const tablerIconsLoading = fetch('https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-nodes-outline.json')
-      .then(r => r.json())
-      .then(data => {
-        tablerIconsDB = data;
-        console.log(`Loaded ${Object.keys(data).length} Tabler icons from CDN`);
-      })
-      .catch(e => console.warn('Could not load extended Tabler icons:', e));
+    let tablerIconsDB = null; // Will be populated from CDN (outline)
+    let tablerIconsFilledDB = null; // Will be populated from CDN (filled)
+    const tablerIconsLoading = Promise.all([
+      fetch('https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-nodes-outline.json')
+        .then(r => r.json())
+        .then(data => {
+          tablerIconsDB = data;
+          console.log(`Loaded ${Object.keys(data).length} Tabler outline icons from CDN`);
+        })
+        .catch(e => console.warn('Could not load Tabler outline icons:', e)),
+      fetch('https://cdn.jsdelivr.net/npm/@tabler/icons@latest/tabler-nodes-filled.json')
+        .then(r => r.json())
+        .then(data => {
+          tablerIconsFilledDB = data;
+          console.log(`Loaded ${Object.keys(data).length} Tabler filled icons from CDN`);
+        })
+        .catch(e => console.warn('Could not load Tabler filled icons:', e)),
+    ]);
 
     // Unified icon lookup: checks hardcoded first (instant), then Tabler DB
-    // Returns an array of SVG path strings for the icon, or null if not found
-    function getIconPaths(iconName) {
+    // Returns { paths: string[], filled: boolean } or null if not found
+    function getIconInfo(iconName) {
       if (!iconName) return null;
-      // 1. Check hardcoded icons (single path string)
-      if (icons[iconName]) return [icons[iconName]];
-      // 2. Check Tabler DB (array of [tag, {d: ...}] entries)
-      if (tablerIconsDB && tablerIconsDB[iconName]) {
-        const paths = tablerIconsDB[iconName]
-          .filter(entry => entry[0] === 'path' && entry[1] && entry[1].d)
-          .filter(entry => entry[1].d !== 'M0 0h24v24H0z') // skip bounding box
-          .map(entry => entry[1].d);
-        if (paths.length > 0) return paths;
+      // 1. Check hardcoded icons (single path string, always outline)
+      if (icons[iconName]) return { paths: [icons[iconName]], filled: false };
+      // 2. Check filled DB first when name ends with -filled, otherwise outline first
+      const dbs = iconName.endsWith('-filled')
+        ? [{ db: tablerIconsFilledDB, filled: true }, { db: tablerIconsDB, filled: false }]
+        : [{ db: tablerIconsDB, filled: false }, { db: tablerIconsFilledDB, filled: true }];
+      for (const { db, filled } of dbs) {
+        if (db && db[iconName]) {
+          const paths = db[iconName]
+            .filter(entry => entry[0] === 'path' && entry[1] && entry[1].d)
+            .filter(entry => entry[1].d !== 'M0 0h24v24H0z') // skip bounding box
+            .map(entry => entry[1].d);
+          if (paths.length > 0) return { paths, filled };
+        }
       }
       return null;
+    }
+
+    // Returns path array for backwards-compat callers
+    function getIconPaths(iconName) {
+      const info = getIconInfo(iconName);
+      return info ? info.paths : null;
     }
 
     // Check if an icon name is valid (exists in either source)
@@ -3231,7 +3252,9 @@ Process > End`;
         if (!node) return;
         const x = p.x + ox, y = p.y + oy, w = p.width, h = p.height;
         const fill = node.color || nodeFill;
-        const iconPaths = getIconPaths(node.icon);
+        const iconInfo = getIconInfo(node.icon);
+        const iconPaths = iconInfo ? iconInfo.paths : null;
+        const iconFilled = iconInfo ? iconInfo.filled : false;
         const nodeHasIcon = iconPaths !== null;
         const textMode = node.text || 'wrap';
         const label = node.label || node.id;
@@ -3241,9 +3264,12 @@ Process > End`;
 
         svg += renderShape(node.shape, x, y, w, h, fill, nodeStroke);
 
-        // Icon (supports multi-path Tabler icons)
+        // Icon (supports multi-path Tabler icons, outline and filled variants)
         if (nodeHasIcon) {
-          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`;
+          const iconSvgAttrs = iconFilled
+            ? `fill="${textColor}" stroke="none"`
+            : `fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+          svg += `<g transform="translate(${x + 10},${y + h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" ${iconSvgAttrs}>`;
           iconPaths.forEach(d => { svg += `<path d="${d}"/>`; });
           svg += `</svg></g>`;
         }
