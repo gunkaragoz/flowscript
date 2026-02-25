@@ -1706,6 +1706,26 @@ Ctrl+N          New file</pre>
 
     const STORAGE_KEY = 'flowscript_demo_files_v2';
     const VERSIONS_KEY = 'flowscript_versions_v1';
+    const PANE_KEY = 'flowscript_pane_widths';
+
+    function savePaneWidths() {
+      try {
+        localStorage.setItem(PANE_KEY, JSON.stringify({
+          sidebar: document.getElementById('sidebar').style.width,
+          editor: document.getElementById('editorPanel').style.width
+        }));
+      } catch (e) {}
+    }
+
+    function restorePaneWidths() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(PANE_KEY));
+        if (saved) {
+          if (saved.sidebar) document.getElementById('sidebar').style.width = saved.sidebar;
+          if (saved.editor) document.getElementById('editorPanel').style.width = saved.editor;
+        }
+      } catch (e) {}
+    }
 
     // Version storage: { filename: [{ id, timestamp, comment, content }, ...] }
     let fileVersions = {};
@@ -1880,7 +1900,8 @@ Ctrl+N          New file</pre>
         document.getElementById('editorPanel').style.display = 'flex';
         document.getElementById('editorResize').style.display = 'block';
         document.getElementById('canvasPanel').style.display = 'block';
-        
+        restorePaneWidths();
+
         state.demoMode = false;
         await refreshFileTree();
         updateGrid();
@@ -3558,6 +3579,7 @@ Process > End`;
         activeHandle = null;
         document.body.style.cursor = '';
         document.body.style.userSelect = '';
+        savePaneWidths();
       });
     })();
 
@@ -4356,9 +4378,10 @@ Ship Order > Complete`
         document.getElementById('editorPanel').style.display = 'flex';
         document.getElementById('editorResize').style.display = 'block';
         document.getElementById('canvasPanel').style.display = 'block';
+        restorePaneWidths();
 
         renderDemoFileTree();
-        
+
         // Restore current file or open first
         const fileToOpen = saved.currentFile && state.files.has(saved.currentFile) 
           ? saved.currentFile 
@@ -4393,6 +4416,7 @@ Ship Order > Complete`
       document.getElementById('editorPanel').style.display = 'flex';
       document.getElementById('editorResize').style.display = 'block';
       document.getElementById('canvasPanel').style.display = 'block';
+      restorePaneWidths();
 
       renderDemoFileTree();
       openDemoFile('welcome.flow');
