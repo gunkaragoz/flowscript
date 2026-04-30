@@ -2736,6 +2736,32 @@ Process > End`;
         satelliteResults.set(gIdx, satResult);
       }
 
+      // Layout ungrouped nodes (not inside any container) as a separate column.
+      const ungroupedNodes = autoNodes.filter(n => !nodeToGroup.has(n.id));
+      let ungroupedElkResult = null;
+      if (ungroupedNodes.length > 0) {
+        const ugInternalEdges = parsed.edges.filter(e =>
+          !e.sourceIsGroup && !e.targetIsGroup &&
+          !nodeToGroup.has(e.source) && !nodeToGroup.has(e.target)
+        );
+        ungroupedElkResult = await elk.layout({
+          id: 'ungrouped',
+          layoutOptions: {
+            'elk.algorithm': 'layered',
+            'elk.direction': elkDirection,
+            'elk.spacing.nodeNode': '30',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '20',
+            'elk.edgeRouting': 'ORTHOGONAL',
+          },
+          children: ungroupedNodes.map(n => createElkNode(n)),
+          edges: ugInternalEdges.map((e, i) => {
+            const edgeId = `ug_${i}`;
+            parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
+            return { id: edgeId, sources: [e.source], targets: [e.target] };
+          })
+        });
+      }
+
       // Position groups: primary group on the left, satellite groups to the right
       // Satellite groups are vertically aligned with the exit node in the primary group
       const primaryGx = groupPadding.left;
@@ -2771,6 +2797,24 @@ Process > End`;
           satellitePositions.set(tGroup, true); // mark as seen
         }
       });
+
+      // Ensure every satellite group has an entry in satelliteOrder. Groups that are
+      // not directly connected from primary-group exits have no idealY yet — without
+      // this step they all fall back to y:0 and completely overlap each other.
+      {
+        const seenGroups = new Set(satelliteOrder.map(s => s.gIdx));
+        const unpositioned = [];
+        for (const [gIdx, satResult] of satelliteResults) {
+          if (gIdx === primaryGroupIdx || seenGroups.has(gIdx)) continue;
+          const satHeight = satResult.height || 200;
+          const totalH = satHeight + groupPadding.top + groupPadding.bottom;
+          const sx = primaryGx + primaryWidth + groupPadding.left + groupPadding.right + groupSpacing;
+          unpositioned.push({ gIdx, x: sx, idealY: 0, height: totalH });
+        }
+        // Prepend so these groups appear above the primary-connected satellites,
+        // preserving top-to-bottom flow order.
+        satelliteOrder.unshift(...unpositioned);
+      }
 
       // Resolve overlaps: push each satellite down if it overlaps the previous one
       // Use consistent spacing between groups
@@ -2853,6 +2897,22 @@ Process > End`;
         });
       }
 
+      // Add ungrouped nodes positioned above the primary group.
+      if (ungroupedElkResult) {
+        const ugHeight = ungroupedElkResult.height || 0;
+        const ugX = primaryGx;
+        const ugY = primaryGy - ugHeight - groupSpacing;
+        (ungroupedElkResult.children || []).forEach(c => {
+          allChildren.push({
+            id: c.id,
+            x: ugX + (c.x || 0),
+            y: ugY + (c.y || 0),
+            width: c.width,
+            height: c.height
+          });
+        });
+      }
+
       // Build cross-group edges with smart port selection:
       // - Outputs leave from bottom or right side of the source node
       // - Inputs enter from top or left side of the target node
@@ -2861,10 +2921,18 @@ Process > End`;
         if (e.sourceIsGroup || e.targetIsGroup) return;
         const sGroup = nodeToGroup.get(e.source);
         const tGroup = nodeToGroup.get(e.target);
-        if (sGroup !== undefined && tGroup !== undefined && sGroup !== tGroup) {
-          // Find source and target node absolute positions
+        // Draw edges between different zones (grouped↔grouped, ungrouped↔grouped).
+        // Skip only when both endpoints are ungrouped (same zone).
+        const crossZone = sGroup !== tGroup && !(sGroup === undefined && tGroup === undefined);
+        if (crossZone) {
+          // Find source and target node absolute positions.
+          // Ungrouped nodes are stored directly in allChildren (no gc.children wrapper).
           let srcPos = null, tgtPos = null;
           allChildren.forEach(gc => {
+            if (!gc.id.startsWith('__group_')) {
+              if (gc.id === e.source) srcPos = { x: gc.x, y: gc.y, w: gc.width, h: gc.height };
+              if (gc.id === e.target) tgtPos = { x: gc.x, y: gc.y, w: gc.width, h: gc.height };
+            }
             (gc.children || []).forEach(c => {
               if (c.id === e.source) srcPos = { x: c.x + gc.x, y: c.y + gc.y, w: c.width, h: c.height };
               if (c.id === e.target) tgtPos = { x: c.x + gc.x, y: c.y + gc.y, w: c.width, h: c.height };
