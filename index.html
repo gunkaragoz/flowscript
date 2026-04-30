@@ -3256,7 +3256,7 @@ Process > End`;
         const fill = g.data?.color ? hexToRgba(g.data.color, 0.12) : groupFill;
         const stroke = g.data?.color || groupStroke;
         svg += `<rect x="${x}" y="${y}" width="${g.width}" height="${g.height}" rx="8" fill="${fill}" stroke="${stroke}" stroke-width="1.5" stroke-dasharray="4 2"/>`;
-        svg += `<text x="${x + 10}" y="${y + 18}" fill="${g.data?.color || textDim}" font-size="11" font-weight="600" font-family="DM Sans,sans-serif">${esc(g.data?.name || '')}</text>`;
+        svg += `<text x="${x + 10}" y="${y + 18}" fill="${g.data?.color || textDim}" font-size="11" font-weight="600" font-family="DM Sans,sans-serif">${esc(g.data?.label || g.data?.name || '')}</text>`;
       });
 
       // Edges
