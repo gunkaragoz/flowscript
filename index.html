@@ -3156,6 +3156,63 @@ Process > End`;
       return lines;
     }
 
+    // Strip markdown markers to measure visible character width
+    function mdVisibleText(text) {
+      return text
+        .replace(/\*\*(.+?)\*\*/g, '$1')
+        .replace(/\*(.+?)\*/g, '$1')
+        .replace(/`(.+?)`/g, '$1')
+        .replace(/^-\s+/, '• ');
+    }
+
+    // Word-wrap note text with markdown-aware width measurement.
+    // Supports explicit \n line breaks and returns raw markdown lines.
+    function wrapNoteText(rawText) {
+      const innerW = NOTE_CONFIG.maxWidth - NOTE_CONFIG.padding * 2;
+      const lines = [];
+      for (const para of rawText.replace(/\\n/g, '\n').split('\n')) {
+        if (!para.trim()) { lines.push(''); continue; }
+        const words = para.split(' ');
+        let cur = '';
+        for (const word of words) {
+          const test = cur ? `${cur} ${word}` : word;
+          if (mdVisibleText(test).length * NOTE_CONFIG.charWidth > innerW && cur) {
+            lines.push(cur);
+            cur = word;
+          } else {
+            cur = test;
+          }
+        }
+        if (cur) lines.push(cur);
+      }
+      return lines;
+    }
+
+    // Render a single note line with inline markdown as SVG tspans.
+    // Returns an SVG <text> string.
+    function renderNoteLine(rawLine, x, y, nText, nCode) {
+      const isBullet = /^-\s+/.test(rawLine);
+      const content = isBullet ? '• ' + rawLine.replace(/^-\s+/, '') : rawLine;
+      const segments = [];
+      const re = /\*\*(.+?)\*\*|\*(.+?)\*|`(.+?)`|([^*`]+)/g;
+      let m;
+      while ((m = re.exec(content)) !== null) {
+        if (m[1] !== undefined)      segments.push({ t: m[1], bold: true });
+        else if (m[2] !== undefined) segments.push({ t: m[2], italic: true });
+        else if (m[3] !== undefined) segments.push({ t: m[3], code: true });
+        else if (m[4] !== undefined) segments.push({ t: m[4] });
+      }
+      let out = `<text x="${x}" y="${y}" font-family="DM Sans,sans-serif" font-size="${NOTE_CONFIG.fontSize}" fill="${nText}">`;
+      for (const seg of segments) {
+        const attrs = [];
+        if (seg.bold)   attrs.push(`font-weight="600"`);
+        if (seg.italic) attrs.push(`font-style="italic"`);
+        if (seg.code)   attrs.push(`font-family="monospace" fill="${nCode}"`);
+        out += `<tspan${attrs.length ? ' ' + attrs.join(' ') : ''}>${esc(seg.t)}</tspan>`;
+      }
+      return out + '</text>';
+    }
+
     // Calculate edge label dimensions with wrapping
     function calculateEdgeLabelDimensions(labelText) {
       if (!labelText) return null;
@@ -3246,10 +3303,9 @@ Process > End`;
         if (!node.note) return;
         const p = positioned.find(pp => pp.id === node.id);
         if (!p) return;
-        const scaledMax = Math.floor((NOTE_CONFIG.maxWidth - NOTE_CONFIG.padding * 2) * TEXT_CONFIG.charWidth / NOTE_CONFIG.charWidth);
-        const nl = wrapText(node.note, scaledMax);
+        const nl = wrapNoteText(node.note);
         const nw = Math.min(NOTE_CONFIG.maxWidth, Math.max(80,
-          Math.max(...nl.map(l => l.length * NOTE_CONFIG.charWidth)) + NOTE_CONFIG.padding * 2));
+          Math.max(...nl.map(l => mdVisibleText(l).length * NOTE_CONFIG.charWidth)) + NOTE_CONFIG.padding * 2));
         const nh = nl.length * NOTE_CONFIG.lineHeight + NOTE_CONFIG.padding * 2;
         maxX = Math.max(maxX, p.x + p.width + NOTE_CONFIG.offsetX + nw);
         maxY = Math.max(maxY, p.y + p.height / 2 + nh / 2);
@@ -3447,10 +3503,9 @@ Process > End`;
         }
 
         if (node.note) {
-          const scaledMax = Math.floor((NOTE_CONFIG.maxWidth - NOTE_CONFIG.padding * 2) * TEXT_CONFIG.charWidth / NOTE_CONFIG.charWidth);
-          const noteLines = wrapText(node.note, scaledMax);
+          const noteLines = wrapNoteText(node.note);
           const nw = Math.min(NOTE_CONFIG.maxWidth, Math.max(80,
-            Math.max(...noteLines.map(l => l.length * NOTE_CONFIG.charWidth)) + NOTE_CONFIG.padding * 2));
+            Math.max(...noteLines.map(l => mdVisibleText(l).length * NOTE_CONFIG.charWidth)) + NOTE_CONFIG.padding * 2));
           const nh = noteLines.length * NOTE_CONFIG.lineHeight + NOTE_CONFIG.padding * 2;
           const nx = x + w + NOTE_CONFIG.offsetX;
           const ny = y + h / 2 - nh / 2;
@@ -3460,6 +3515,7 @@ Process > End`;
           const nStroke = isDark ? '#7a7020' : '#c8b400';
           const nFold   = isDark ? '#5a5520' : '#f0e060';
           const nText   = isDark ? '#e8e0a0' : '#4a4000';
+          const nCode   = isDark ? '#a0c0ff' : '#2563eb';
           const nConn   = isDark ? '#6a6030' : '#c8b400';
 
           // Dashed connector: node right-center → note left-center
@@ -3471,11 +3527,11 @@ Process > End`;
           svg += `<polygon points="${nx},${ny} ${fx},${ny} ${nx + nw},${fy2} ${nx + nw},${ny + nh} ${nx},${ny + nh}" fill="${nFill}" stroke="${nStroke}" stroke-width="1" stroke-linejoin="round"/>`;
           svg += `<polygon points="${fx},${ny} ${nx + nw},${fy2} ${fx},${fy2}" fill="${nFold}" stroke="${nStroke}" stroke-width="1"/>`;
 
-          // Note text
+          // Note text with inline markdown
           const txtX = nx + NOTE_CONFIG.padding;
           const txtY = ny + NOTE_CONFIG.padding + NOTE_CONFIG.fontSize;
           noteLines.forEach((line, i) => {
-            svg += `<text x="${txtX}" y="${txtY + i * NOTE_CONFIG.lineHeight}" fill="${nText}" font-size="${NOTE_CONFIG.fontSize}" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+            svg += renderNoteLine(line, txtX, txtY + i * NOTE_CONFIG.lineHeight, nText, nCode);
           });
         }
       });
