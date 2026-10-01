@@ -566,6 +566,11 @@
       filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.35));
     }
 
+    /* Sequence diagram lifelines are decorative — never swallow a drag */
+    #canvas line[data-lifeline-for] {
+      pointer-events: none;
+    }
+
     body.fs-dragging,
     body.fs-dragging * {
       cursor: grabbing !important;
@@ -10616,7 +10621,7 @@ Process > End`;
     // ============================================
 
     const SEQ_CONFIG = {
-      colGap: 90,            // minimum distance between actor column centers
+      colGap: 64,            // gap between actor box EDGES (not centers)
       minBoxWidth: 90,
       maxBoxWidth: 180,
       boxHeight: 44,
@@ -10821,6 +10826,7 @@ Process > End`;
       const iconSpace = 24;
 
       let prevCenter = -Infinity;
+      let prevW = 0;
       const boxes = parsed.actors.map(a => {
         const iconInfo = getIconInfo(a.icon);
         const hasIcon = !!(iconInfo && iconInfo.paths);
@@ -10831,22 +10837,30 @@ Process > End`;
         const w = Math.max(C.minBoxWidth, Math.min(C.maxBoxWidth, textW + TEXT_CONFIG.padding * 2 + iconW));
         const h = C.boxHeight;
 
-        // Pinned actors keep their authored x; the rest flow with colGap
-        let x = a.pos ? a.pos.x : (prevCenter === -Infinity ? pad : prevCenter + C.colGap - w / 2);
-        let y = a.pos ? a.pos.y : pad;
+        // Pinned actors keep their authored position (clamped so nothing is
+        // clipped off-canvas); the rest flow right with a fixed edge gap
+        let x, y;
+        if (a.pos) {
+          x = Math.max(0, a.pos.x);
+          y = Math.max(0, a.pos.y);
+        } else {
+          // Previous box's right edge + the edge gap
+          x = prevCenter === -Infinity ? pad : prevCenter + prevW / 2 + C.colGap;
+          y = pad;
+        }
         const centerX = x + w / 2;
         prevCenter = centerX;
+        prevW = w;
 
         return { id: a.id, x, y, w, h, centerX, lines, hasIcon, iconInfo };
       });
 
       const boxById = new Map(boxes.map(b => [b.id, b]));
 
-      // One row per message
-      const top = pad + C.boxHeight + 26;
+      // One row per message (rows start below the lowest actor box)
+      const top = Math.max(...boxes.map(b => b.y + b.h), pad + C.boxHeight) + 26;
       const rows = parsed.messages.map((m, i) => top + i * C.rowHeight);
-      const lifelineTop = pad + C.boxHeight;
-      const lifelineBottom = rows.length ? rows[rows.length - 1] + 34 : lifelineTop + 60;
+      const lifelineBottom = rows.length ? rows[rows.length - 1] + 34 : top + 60;
 
       // Message routes
       const messages = parsed.messages.map((m, i) => {
@@ -10920,7 +10934,7 @@ Process > End`;
         maxY = Math.max(maxY, b.y + b.height);
       });
 
-      return { boxes, boxById, rows, messages, blocks, activations, lifelineTop, lifelineBottom, width: maxX + pad, height: maxY + pad, anyPin: parsed.actors.some(a => a.pos) };
+      return { boxes, boxById, rows, messages, blocks, activations, lifelineBottom, width: maxX + pad, height: maxY + pad, anyPin: parsed.actors.some(a => a.pos) };
     }
 
     // Render a sequence diagram. Actors are emitted as draggable fs-node groups;
@@ -10960,9 +10974,9 @@ Process > End`;
         }
       });
 
-      // Lifelines
+      // Lifelines (non-interactive so grabbing near one still drags its actor)
       laid.boxes.forEach(b => {
-        svg += `<line data-lifeline-for="${esc(b.id)}" x1="${b.centerX}" y1="${laid.lifelineTop}" x2="${b.centerX}" y2="${laid.lifelineBottom}" stroke="${edgeStroke}" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"/>`;
+        svg += `<line data-lifeline-for="${esc(b.id)}" x1="${b.centerX}" y1="${b.y + b.h}" x2="${b.centerX}" y2="${laid.lifelineBottom}" stroke="${edgeStroke}" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"/>`;
       });
 
       // Activation bars
