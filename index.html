@@ -1202,6 +1202,22 @@ direction bottom  // alias for up</pre>
       </div>
 
       <div class="help-section">
+        <h3>Sequence Diagrams</h3>
+        <pre>type sequence        Add at the top to force a sequence diagram
+
+Client [icon: monitor, color: gray]   Actor
+Client > Server: Fetch data           Message
+Client > Client: Poll                 Self message
+Server --&gt; Client: Cached            Dotted arrow
+
+loop [label: retry] { ... }           loop / opt / alt /
+else [label: fallback] { ... }        par / break, + else / and
+
+activate Server                       Activation bar on
+deactivate Server                     an actor lifeline</pre>
+      </div>
+
+      <div class="help-section">
         <h3>Dragging</h3>
         <pre>Drag node      Moves a single node (position saved as pos: x,y)
 Drag group      Moves the whole group with its nodes
@@ -8870,6 +8886,9 @@ Process > End`;
     // ============================================
 
     function parse(source) {
+      // Sequence diagrams use their own syntax and renderer
+      if (isSequenceSource(source)) return parseSequence(source);
+
       const nodes = new Map();
       const edges = [];
       const groups = [];
@@ -8908,8 +8927,8 @@ Process > End`;
           continue;
         }
         
-        // Skip direction/style directives
-        if (/^(direction|colorMode|styleMode|typeface)\s+/i.test(trimmed)) {
+        // Skip direction/style/type directives
+        if (/^(direction|colorMode|styleMode|typeface|type|diagram)\s+/i.test(trimmed)) {
           i++;
           continue;
         }
@@ -8999,15 +9018,12 @@ Process > End`;
       for (const token of tokens) {
         if (token.type === 'group') {
           const props = parseProperties(token.props);
-          const posMatch = token.props
-            ? token.props.match(/pos\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i)
-            : null;
           const group = {
             name: token.name,
             color: props.color ? (colorPalette[props.color] || props.color) : null,
             icon: props.icon,
             label: props.label || token.name,
-            pos: posMatch ? { x: parseFloat(posMatch[1]), y: parseFloat(posMatch[2]) } : null,
+            pos: parsePosFromProps(token.props),
             children: []
           };
           groups.push(group);
@@ -9134,6 +9150,23 @@ Process > End`;
       return result;
     }
 
+    // Extract a manual `pos: x,y` override from raw property text. The generic
+    // property splitter treats the comma as a separator, so read it directly.
+    function parsePosFromProps(propsStr) {
+      if (!propsStr) return null;
+      const m = propsStr.match(/pos\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i);
+      return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : null;
+    }
+
+    // Resolve a color property (named palette color or hex) to a concrete color
+    function resolvePropColor(value) {
+      if (!value) return null;
+      let color = colorPalette[value] || value;
+      // Handle hex in quotes
+      if (color.startsWith('"')) color = color.replace(/"/g, '');
+      return color;
+    }
+
     function parseNode(text) {
       let remaining = text.trim();
       if (!remaining) return null;
@@ -9143,13 +9176,8 @@ Process > End`;
       const props = propsMatch ? parseProperties(`[${propsMatch[1]}]`) : {};
       remaining = remaining.replace(/\[[^\]]+\]/, '').trim();
 
-      // Manual position override `pos: x,y` — read from the raw bracket text,
-      // because the generic property splitter treats commas as separators.
-      let pos = null;
-      if (propsMatch) {
-        const posMatch = propsMatch[1].match(/pos\s*:\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)/i);
-        if (posMatch) pos = { x: parseFloat(posMatch[1]), y: parseFloat(posMatch[2]) };
-      }
+      // Manual position override `pos: x,y` (written by drag & drop)
+      const pos = propsMatch ? parsePosFromProps(propsMatch[1]) : null;
       
       // Handle quoted names
       let id = remaining;
@@ -9164,12 +9192,7 @@ Process > End`;
       const shapeInfo = shapeMap[shape] || shapeMap.default;
       
       // Resolve color
-      let color = null;
-      if (props.color) {
-        color = colorPalette[props.color] || props.color;
-        // Handle hex in quotes
-        if (color.startsWith('"')) color = color.replace(/"/g, '');
-      }
+      const color = resolvePropColor(props.color);
       
       // Text mode: wrap (default), fit, clip
       const textMode = props.text ? props.text.toLowerCase() : 'wrap';
@@ -10588,6 +10611,432 @@ Process > End`;
 
     let updateTimer;
     let tablerIconsReady = false;
+    // ============================================
+    // Sequence Diagrams
+    // ============================================
+
+    const SEQ_CONFIG = {
+      colGap: 90,            // minimum distance between actor column centers
+      minBoxWidth: 90,
+      maxBoxWidth: 180,
+      boxHeight: 44,
+      rowHeight: 50,         // vertical space per message
+      selfLoopWidth: 46,
+      selfLoopHeight: 26,
+      activationWidth: 12,
+      blockPadX: 20,
+      blockPadTop: 22,
+      blockPadBottom: 20,
+      pad: 40
+    };
+
+    const SEQ_ACTOR_MARGIN = 60; // space reserved around a block for its actor boxes
+
+    // Sequence diagrams are requested explicitly (`type sequence`) or inferred
+    // from constructs that cannot occur in a flowchart: control-flow blocks and
+    // activate/deactivate statements.
+    function isSequenceSource(source) {
+      if (/^\s*(type|diagram)\s+sequence\b/im.test(source)) return true;
+      for (const raw of source.split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('//')) continue;
+        if (/^(activate|deactivate)\s+\S/i.test(line)) return true;
+        if (/^(loop|opt|alt|par|break|else|and)\b[^\n]*\{/i.test(line)) return true;
+      }
+      return false;
+    }
+
+    // Parse Eraser-compatible sequence diagram syntax:
+    //   Client [icon: monitor, color: gray]   // actor definition
+    //   Client > Server: Fetch data            // message (same arrows as flowcharts)
+    //   loop [label: retry] { ... }            // control-flow block
+    //   else [label: fallback] { ... }         // connected block section
+    //   activate Server / deactivate Server    // activation bar
+    function parseSequence(source) {
+      const actors = new Map();
+      const messages = [];
+      const blocks = [];
+      const activations = [];
+      const openActivations = new Map();
+      const blockStack = [];
+
+      // Define an actor, or merge visual properties into an existing one
+      function defineActor(text) {
+        const m = text.trim().match(/^([\s\S]*?)\s*(\[[^\]]*\])?\s*$/);
+        if (!m) return null;
+        let name = (m[1] || '').trim();
+        const propsStr = m[2] || '';
+        if (!name) return null;
+        if (name.startsWith('"') && name.endsWith('"')) name = name.slice(1, -1);
+        const props = parseProperties(propsStr);
+        const pos = parsePosFromProps(propsStr);
+        const existing = actors.get(name);
+        if (existing) {
+          if (props.label && existing.label === existing.id) existing.label = props.label;
+          if (props.icon && !existing.icon) existing.icon = props.icon;
+          if (props.color && !existing.color) existing.color = resolvePropColor(props.color);
+          if (pos && !existing.pos) existing.pos = pos;
+          return existing;
+        }
+        const shapeKey = props.shape ? props.shape.toLowerCase() : 'rectangle';
+        const shapeInfo = shapeMap[shapeKey] || shapeMap.default;
+        const actor = {
+          id: name,
+          label: props.label || name,
+          shape: shapeInfo.shape,
+          shapeRadius: shapeInfo.radius,
+          color: resolvePropColor(props.color),
+          icon: props.icon,
+          pos
+        };
+        actors.set(name, actor);
+        return actor;
+      }
+
+      // Split a message line into connector type and parts
+      function splitMessage(text) {
+        const firstColon = text.indexOf(':');
+        const connDef = firstColon >= 0 ? text.slice(0, firstColon) : text;
+        if (connDef.includes('<>')) return ['<>', splitConnector(text, '<>')];
+        if (connDef.includes('-->')) return ['-->', splitConnector(text, '-->')];
+        if (connDef.includes('--')) return ['--', splitConnector(text, '--')];
+        if (connDef.includes('<') && !connDef.includes('>')) return ['<', splitConnector(text, '<')];
+        if (connDef.includes('>')) return ['>', splitConnector(text, '>')];
+        if (/\s-\s/.test(text)) return ['-', text.split(/\s-\s/).map(p => p.trim())];
+        return [null, []];
+      }
+
+      for (const raw of source.split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('//')) continue;
+        if (/^(direction|colorMode|styleMode|typeface|type|diagram)\s+/i.test(line)) continue;
+
+        // --- activate / deactivate ---
+        const actMatch = line.match(/^(activate|deactivate)\s+(.+?)\s*$/i);
+        if (actMatch) {
+          const kind = actMatch[1].toLowerCase();
+          const name = actMatch[2].trim();
+          if (kind === 'activate') {
+            const actor = defineActor(name);
+            if (actor) {
+              const act = { actor: actor.id, start: messages.length, end: messages.length };
+              activations.push(act);
+              openActivations.set(actor.id, act);
+            }
+          } else {
+            const actor = actors.get(name) || defineActor(name);
+            const act = actor && openActivations.get(actor.id);
+            if (act) {
+              act.end = messages.length;
+              openActivations.delete(actor.id);
+            }
+          }
+          continue;
+        }
+
+        // --- control-flow blocks ---
+        const blockMatch = line.match(/^(loop|opt|alt|par|break|else|and)\b\s*(\[[^\]]*\])?\s*\{?\s*$/i);
+        if (blockMatch && line.includes('{')) {
+          const props = parseProperties(blockMatch[2] || '');
+          const block = {
+            type: blockMatch[1].toLowerCase(),
+            label: props.label || null,
+            color: resolvePropColor(props.color),
+            startMsg: messages.length,
+            endMsg: null,
+            depth: blockStack.length
+          };
+          blocks.push(block);
+          blockStack.push(block);
+          continue;
+        }
+        if (line === '}' || line === '};') {
+          const block = blockStack.pop();
+          if (block) {
+            if (messages.length > block.startMsg) {
+              block.endMsg = messages.length - 1;
+            } else {
+              blocks.splice(blocks.indexOf(block), 1); // drop empty blocks
+            }
+          }
+          continue;
+        }
+
+        // --- message ---
+        if (hasConnectorChar(line) || /\s-\s/.test(line) || line.includes('--')) {
+          const [connectorType, parts] = splitMessage(line);
+          if (connectorType && parts.length >= 2) {
+            for (let i = 0; i < parts.length - 1; i++) {
+              const src = defineActor(parts[i]);
+              let targetPart = parts[i + 1];
+              let label = '';
+              let color = null;
+              if (i === parts.length - 2) {
+                // The last target may carry ": label" (and trailing message props)
+                const colonMatch = targetPart.match(/^(.+?):\s*(.*)$/);
+                if (colonMatch) {
+                  targetPart = colonMatch[1].trim();
+                  label = colonMatch[2].trim();
+                  const lp = label.match(/\[([^\]]*)\]\s*$/);
+                  if (lp) {
+                    color = resolvePropColor(parseProperties(`[${lp[1]}]`).color);
+                    label = label.replace(/\[([^\]]*)\]\s*$/, '').trim();
+                  }
+                }
+              }
+              const tgt = defineActor(targetPart);
+              if (src && tgt) {
+                messages.push({ source: src.id, target: tgt.id, label, connectorType, color });
+              }
+            }
+          }
+          continue;
+        }
+
+        // --- actor definition ---
+        splitOutsideBrackets(line, ',').forEach(part => defineActor(part));
+      }
+
+      // Close activations that were never deactivated (run to the last row)
+      openActivations.forEach(act => { act.end = messages.length; });
+
+      return {
+        type: 'sequence',
+        actors: Array.from(actors.values()),
+        messages,
+        blocks,
+        activations,
+        direction: 'down',
+        nodes: [],
+        edges: [],
+        groups: [],
+        groupNames: new Set()
+      };
+    }
+
+    // Columns for actors, one row per message, plus block/activation geometry
+    function layoutSequence(parsed) {
+      const C = SEQ_CONFIG;
+      const pad = C.pad;
+      const iconSpace = 24;
+
+      let prevCenter = -Infinity;
+      const boxes = parsed.actors.map(a => {
+        const iconInfo = getIconInfo(a.icon);
+        const hasIcon = !!(iconInfo && iconInfo.paths);
+        const iconW = hasIcon ? iconSpace : 0;
+        const availW = C.maxBoxWidth - TEXT_CONFIG.padding * 2 - iconW;
+        const lines = wrapText(a.label, availW);
+        const textW = Math.max(...lines.map(l => l.length * TEXT_CONFIG.charWidth));
+        const w = Math.max(C.minBoxWidth, Math.min(C.maxBoxWidth, textW + TEXT_CONFIG.padding * 2 + iconW));
+        const h = C.boxHeight;
+
+        // Pinned actors keep their authored x; the rest flow with colGap
+        let x = a.pos ? a.pos.x : (prevCenter === -Infinity ? pad : prevCenter + C.colGap - w / 2);
+        let y = a.pos ? a.pos.y : pad;
+        const centerX = x + w / 2;
+        prevCenter = centerX;
+
+        return { id: a.id, x, y, w, h, centerX, lines, hasIcon, iconInfo };
+      });
+
+      const boxById = new Map(boxes.map(b => [b.id, b]));
+
+      // One row per message
+      const top = pad + C.boxHeight + 26;
+      const rows = parsed.messages.map((m, i) => top + i * C.rowHeight);
+      const lifelineTop = pad + C.boxHeight;
+      const lifelineBottom = rows.length ? rows[rows.length - 1] + 34 : lifelineTop + 60;
+
+      // Message routes
+      const messages = parsed.messages.map((m, i) => {
+        const sBox = boxById.get(m.source);
+        const tBox = boxById.get(m.target);
+        const self = m.source === m.target;
+        const sx = sBox ? sBox.centerX : 0;
+        const tx = tBox ? tBox.centerX : 0;
+        const y = rows[i];
+        let d, labelX;
+        if (self) {
+          const lw = C.selfLoopWidth;
+          d = `M ${sx} ${y} L ${sx + lw} ${y} L ${sx + lw} ${y + C.selfLoopHeight} L ${sx} ${y + C.selfLoopHeight}`;
+          labelX = sx + lw / 2;
+        } else {
+          d = `M ${sx} ${y} L ${tx} ${y}`;
+          labelX = (sx + tx) / 2;
+        }
+        return { index: i, source: m.source, target: m.target, label: m.label, connectorType: m.connectorType, color: m.color, self, y, d, labelX, labelY: y - 9 };
+      });
+
+      // Blocks: frame the messages they contain
+      const blocks = parsed.blocks.filter(b => b.endMsg !== null).map((b, i) => {
+        let minLeft = Infinity, maxRight = -Infinity;
+        for (let k = b.startMsg; k <= b.endMsg && k < messages.length; k++) {
+          [messages[k].source, messages[k].target].forEach(id => {
+            const box = boxById.get(id);
+            if (!box) return;
+            minLeft = Math.min(minLeft, box.centerX - box.w / 2);
+            maxRight = Math.max(maxRight, box.centerX + box.w / 2);
+          });
+        }
+        if (minLeft === Infinity) { minLeft = pad; maxRight = pad + C.minBoxWidth; }
+        const x = minLeft - C.blockPadX;
+        const width = (maxRight + C.blockPadX) - x;
+        const y = rows[b.startMsg] - C.blockPadTop;
+        const height = rows[b.endMsg] + C.blockPadBottom - y;
+        return {
+          index: i, type: b.type, label: b.label, color: b.color, depth: b.depth,
+          firstMsg: b.startMsg, lastMsg: b.endMsg,
+          x, y, width, height
+        };
+      });
+
+      // Activation bars
+      const activations = parsed.activations.map((a, i) => {
+        const box = boxById.get(a.actor);
+        const cx = box ? box.centerX : 0;
+        const startY = a.start < rows.length ? rows[a.start] : lifelineBottom;
+        const endRow = Math.min(a.end, rows.length - 1);
+        const endY = rows.length ? rows[endRow] + 12 : lifelineBottom;
+        return {
+          index: i, actor: a.actor,
+          x: cx - C.activationWidth / 2, y: startY - 8,
+          width: C.activationWidth, height: Math.max(C.activationWidth, endY - startY + 8)
+        };
+      });
+
+      // Bounds
+      let maxX = pad, maxY = lifelineBottom;
+      boxes.forEach(b => {
+        maxX = Math.max(maxX, b.x + b.w);
+        maxY = Math.max(maxY, b.y + b.h);
+      });
+      messages.forEach(m => {
+        maxX = Math.max(maxX, m.labelX + 120);
+        if (m.self) maxX = Math.max(maxX, m.labelX + C.selfLoopWidth);
+      });
+      blocks.forEach(b => {
+        maxX = Math.max(maxX, b.x + b.width);
+        maxY = Math.max(maxY, b.y + b.height);
+      });
+
+      return { boxes, boxById, rows, messages, blocks, activations, lifelineTop, lifelineBottom, width: maxX + pad, height: maxY + pad, anyPin: parsed.actors.some(a => a.pos) };
+    }
+
+    // Render a sequence diagram. Actors are emitted as draggable fs-node groups;
+    // messages carry data-edge-id so the live drag updater can re-route them.
+    function renderSequence(laid, parsed) {
+      const style = getComputedStyle(document.body);
+      const nodeFill = style.getPropertyValue('--node-fill').trim();
+      const nodeStroke = style.getPropertyValue('--node-stroke').trim();
+      const nodeText = style.getPropertyValue('--node-text').trim();
+      const edgeStroke = style.getPropertyValue('--edge-stroke').trim();
+      const textDim = style.getPropertyValue('--text-dim').trim();
+      const bgSurface = style.getPropertyValue('--bg-surface').trim() || '#1e1e1e';
+
+      const C = SEQ_CONFIG;
+      const W = laid.width, H = laid.height;
+      const actorById = new Map(parsed.actors.map(a => [a.id, a]));
+
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">`;
+      svg += `<defs>`;
+      svg += `<marker id="arrow" markerWidth="6" markerHeight="4" refX="5" refY="2" orient="auto"><polygon points="0 0,6 2,0 4" fill="${edgeStroke}"/></marker>`;
+      svg += `<marker id="arrow-rev" markerWidth="6" markerHeight="4" refX="1" refY="2" orient="auto"><polygon points="6 0,0 2,6 4" fill="${edgeStroke}"/></marker>`;
+      svg += `</defs>`;
+
+      // Block frames (shallow first so nested blocks paint on top)
+      laid.blocks.forEach(b => {
+        const stroke = b.color || edgeStroke;
+        const isSection = b.type === 'else' || b.type === 'and';
+        svg += `<rect data-block-idx="${b.index}" x="${b.x}" y="${b.y}" width="${b.width}" height="${b.height}" rx="8" fill="none" stroke="${stroke}" stroke-width="1.2"${isSection ? '' : ' stroke-dasharray="5 3"'}/>`;
+        // Label tab at the top-left, with a background so the border doesn't cut it
+        const label = b.label ? `${b.type} [${b.label}]` : b.type;
+        const textW = label.length * 6.2 + 10;
+        svg += `<rect x="${b.x + 6}" y="${b.y - 9}" width="${textW}" height="18" rx="3" fill="${bgSurface}" stroke="none"/>`;
+        svg += `<text x="${b.x + 11}" y="${b.y + 4}" fill="${b.color || textDim}" font-size="11" font-weight="600" font-family="DM Sans,sans-serif">${esc(label)}</text>`;
+        // else/and sections get a divider line so the branch grouping reads clearly
+        if (isSection) {
+          svg += `<line x1="${b.x}" y1="${b.y + 14}" x2="${b.x + b.width}" y2="${b.y + 14}" stroke="${stroke}" stroke-width="1" stroke-dasharray="5 3" opacity="0.6"/>`;
+        }
+      });
+
+      // Lifelines
+      laid.boxes.forEach(b => {
+        svg += `<line data-lifeline-for="${esc(b.id)}" x1="${b.centerX}" y1="${laid.lifelineTop}" x2="${b.centerX}" y2="${laid.lifelineBottom}" stroke="${edgeStroke}" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"/>`;
+      });
+
+      // Activation bars
+      laid.activations.forEach(a => {
+        const actor = actorById.get(a.actor);
+        const fill = (actor && actor.color) || edgeStroke;
+        svg += `<rect data-activation-idx="${a.index}" x="${a.x}" y="${a.y}" width="${a.width}" height="${a.height}" rx="2" fill="${hexToRgba(fill, 0.22)}" stroke="${fill}" stroke-width="1"/>`;
+      });
+
+      // Messages
+      laid.messages.forEach(m => {
+        const ct = m.connectorType || '>';
+        const eColor = m.color || edgeStroke;
+        const isDotted = ct === '--' || ct === '-->';
+        const dashAttr = isDotted ? ' stroke-dasharray="6 3"' : '';
+        let markerStart = '', markerEnd = '';
+        if (ct === '>' || ct === '-->') markerEnd = ' marker-end="url(#arrow)"';
+        else if (ct === '<') markerStart = ' marker-start="url(#arrow-rev)"';
+        else if (ct === '<>') { markerStart = ' marker-start="url(#arrow-rev)"'; markerEnd = ' marker-end="url(#arrow)"'; }
+
+        svg += `<path data-edge-id="sqm_${m.index}" d="${m.d}" fill="none" stroke="${eColor}" stroke-width="1.5"${dashAttr}${markerStart}${markerEnd}/>`;
+
+        if (m.label) {
+          const lines = wrapText(m.label, 90);
+          const lineHeight = 12;
+          const boxW = Math.max(...lines.map(l => l.length * 6)) + 4;
+          const boxH = lines.length * lineHeight + 4;
+          const textStartY = -(lines.length - 1) * lineHeight / 2;
+          svg += `<g data-edge-label-id="sqm_${m.index}" transform="translate(${m.labelX},${m.labelY})">`;
+          svg += `<rect x="${-boxW / 2}" y="${-boxH / 2}" width="${boxW}" height="${boxH}" rx="2" fill="${bgSurface}" stroke="none"/>`;
+          lines.forEach((line, i) => {
+            svg += `<text x="0" y="${textStartY + i * lineHeight}" text-anchor="middle" dominant-baseline="middle" fill="${textDim}" font-size="10" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+          });
+          svg += `</g>`;
+        }
+      });
+
+      // Actor boxes (draggable)
+      laid.boxes.forEach(b => {
+        const actor = actorById.get(b.id);
+        if (!actor) return;
+        const fill = actor.color || nodeFill;
+        const textColor = actor.color ? (isDarkColor(actor.color) ? '#ffffff' : '#1a1a1a') : nodeText;
+        svg += `<g class="fs-node" data-node-id="${esc(actor.id)}">`;
+        svg += renderShape(actor.shape, b.x, b.y, b.w, b.h, fill, nodeStroke);
+        const iconW = b.hasIcon ? 24 : 0;
+        if (b.hasIcon && b.iconInfo) {
+          const attrs = b.iconInfo.filled
+            ? `fill="${textColor}" stroke="none"`
+            : `fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+          svg += `<g transform="translate(${b.x + 10},${b.y + b.h / 2 - 8})"><svg width="16" height="16" viewBox="0 0 24 24" ${attrs}>`;
+          b.iconInfo.paths.forEach(d => { svg += `<path d="${d}"/>`; });
+          svg += `</svg></g>`;
+        }
+        const startY = b.y + (b.h - b.lines.length * TEXT_CONFIG.lineHeight) / 2 + TEXT_CONFIG.lineHeight * 0.7;
+        b.lines.forEach((line, i) => {
+          svg += `<text x="${b.x + b.w / 2 + iconW / 2}" y="${startY + i * TEXT_CONFIG.lineHeight}" text-anchor="middle" fill="${textColor}" font-size="12" font-family="DM Sans,sans-serif" font-weight="500">${esc(line)}</text>`;
+        });
+        svg += `</g>`;
+      });
+
+      svg += `</svg>`;
+
+      // Snapshot for drag interactions
+      state.lastRender = {
+        ox: 0, oy: 0, anyPin: laid.anyPin,
+        nodes: new Map(laid.boxes.map(b => [b.id, { x: b.x, y: b.y, w: b.w, h: b.h }])),
+        groups: [],
+        sequence: laid
+      };
+
+      return { svg, width: W, height: H };
+    }
+
     async function updateDiagram() {
       const source = editor.value;
 
@@ -10600,6 +11049,22 @@ Process > End`;
 
         const parsed = parse(source);
         state.lastParsed = parsed;
+
+        // Sequence diagrams have their own layout + renderer
+        if (parsed.type === 'sequence') {
+          if (parsed.actors.length === 0) {
+            canvas.innerHTML = '';
+            setStatus('Ready', false);
+            return;
+          }
+          const laid = layoutSequence(parsed);
+          const { svg, width, height } = renderSequence(laid, parsed);
+          canvas.innerHTML = svg;
+          canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+          setStatus(`${parsed.actors.length} actors, ${parsed.messages.length} messages`, false);
+          return;
+        }
+
         if (parsed.nodes.length === 0) {
           canvas.innerHTML = '';
           setStatus('Ready', false);
@@ -10884,6 +11349,25 @@ Process > End`;
       const lr = state.lastRender;
       if (!parsed || !state.lastElkResult || !lr) return;
 
+      // Sequence messages are always manually routed, so no re-render is
+      // needed — just cache the elements the per-frame updater will touch.
+      if (parsed.type === 'sequence') {
+        const laid = lr.sequence;
+        if (laid) {
+          const lifelineEls = [...canvas.querySelectorAll('line[data-lifeline-for]')];
+          drag.seqEls = {
+            messages: laid.messages.map((m, i) => ({
+              path: canvas.querySelector(`path[data-edge-id="sqm_${i}"]`),
+              label: canvas.querySelector(`g[data-edge-label-id="sqm_${i}"]`)
+            })),
+            lifelines: laid.boxes.map(b => lifelineEls.find(l => l.getAttribute('data-lifeline-for') === b.id) || null),
+            blocks: laid.blocks.map((b, i) => ({ rect: canvas.querySelector(`rect[data-block-idx="${i}"]`) })),
+            activations: laid.activations.map((a, i) => ({ rect: canvas.querySelector(`rect[data-activation-idx="${i}"]`) }))
+          };
+        }
+        return;
+      }
+
       if (!lr.anyPin) {
         const pinX = drag.base.x - lr.ox, pinY = drag.base.y - lr.oy;
         if (drag.kind === 'node') {
@@ -10944,6 +11428,12 @@ Process > End`;
       if (!d.lastDelta) return;
       const { dx, dy } = d.lastDelta;
       d.elements.forEach(el => el.setAttribute('transform', `translate(${dx},${dy})`));
+
+      // Sequence diagrams: re-route between the live actor columns
+      if (state.lastParsed && state.lastParsed.type === 'sequence') {
+        runSequenceFrame(d);
+        return;
+      }
 
       const parsed = state.lastParsed;
       const lr = state.lastRender;
@@ -11010,6 +11500,78 @@ Process > End`;
       drag.raf = 0;
       drag.elements.forEach(el => el.classList.add('fs-drag-active'));
       runDragFrame(drag);
+    }
+
+    // Live update for sequence diagrams: lifelines follow their column, messages
+    // re-route between live columns, and blocks/activations resize with them.
+    function runSequenceFrame(d) {
+      const laid = state.lastRender && state.lastRender.sequence;
+      if (!laid || !d.seqEls || !d.lastDelta) return;
+      const { dx } = d.lastDelta;
+      const C = SEQ_CONFIG;
+
+      // Live column centers (only the dragged actor moves)
+      const centers = new Map(laid.boxes.map(b => [b.id, b.centerX + (b.id === d.id ? dx : 0)]));
+
+      // Lifelines
+      laid.boxes.forEach((b, i) => {
+        const line = d.seqEls.lifelines[i];
+        if (!line) return;
+        const c = centers.get(b.id);
+        if (c === undefined) return;
+        line.setAttribute('x1', c);
+        line.setAttribute('x2', c);
+      });
+
+      // Messages
+      laid.messages.forEach((m, i) => {
+        const els = d.seqEls.messages[i];
+        if (!els || !els.path) return;
+        const sx = centers.get(m.source);
+        const tx = centers.get(m.target);
+        if (sx === undefined || tx === undefined) return;
+        let dAttr, labelX;
+        if (m.self) {
+          const lw = C.selfLoopWidth;
+          dAttr = `M ${sx} ${m.y} L ${sx + lw} ${m.y} L ${sx + lw} ${m.y + C.selfLoopHeight} L ${sx} ${m.y + C.selfLoopHeight}`;
+          labelX = sx + lw / 2;
+        } else {
+          dAttr = `M ${sx} ${m.y} L ${tx} ${m.y}`;
+          labelX = (sx + tx) / 2;
+        }
+        els.path.setAttribute('d', dAttr);
+        if (els.label) els.label.setAttribute('transform', `translate(${labelX},${m.labelY})`);
+      });
+
+      // Blocks span the actors their messages touch
+      laid.blocks.forEach((b, i) => {
+        const els = d.seqEls.blocks[i];
+        if (!els || !els.rect) return;
+        let minLeft = Infinity, maxRight = -Infinity;
+        for (let k = b.firstMsg; k <= b.lastMsg && k < laid.messages.length; k++) {
+          const m = laid.messages[k];
+          [m.source, m.target].forEach(id => {
+            const box = laid.boxById.get(id);
+            if (!box) return;
+            const c = centers.get(id);
+            minLeft = Math.min(minLeft, c - box.w / 2);
+            maxRight = Math.max(maxRight, c + box.w / 2);
+          });
+        }
+        if (minLeft === Infinity) return;
+        const x0 = minLeft - C.blockPadX;
+        els.rect.setAttribute('x', x0);
+        els.rect.setAttribute('width', (maxRight + C.blockPadX) - x0);
+      });
+
+      // Activation bars
+      laid.activations.forEach((a, i) => {
+        const els = d.seqEls.activations[i];
+        if (!els || !els.rect) return;
+        const c = centers.get(a.actor);
+        if (c === undefined) return;
+        els.rect.setAttribute('x', c - C.activationWidth / 2);
+      });
     }
 
     function cancelDrag() {
@@ -11092,8 +11654,10 @@ Process > End`;
       const gEl = e.target.closest && e.target.closest('g.fs-node, g.fs-group');
       if (!gEl || !state.lastParsed) return;
       if (gEl.classList.contains('fs-node')) {
-        const node = state.lastParsed.nodes.find(n => n.id === gEl.dataset.nodeId);
-        if (node && node.pos) clearNodePosInText(node.id);
+        // Sequence diagrams name them actors; flowcharts name them nodes
+        const list = state.lastParsed.actors || state.lastParsed.nodes;
+        const item = list.find(n => n.id === gEl.dataset.nodeId);
+        if (item && item.pos) clearNodePosInText(item.id);
       } else {
         const g = state.lastParsed.groups[parseInt(gEl.dataset.groupIdx, 10)];
         if (g && g.pos) clearGroupPosInText(g.name);
@@ -11653,6 +12217,34 @@ Cloud [color: orange] {
 Frontend > Backend: REST API
 Backend > Cloud: async jobs
 Cloud > Frontend: static assets`,
+
+      'login-sequence.flow': `// Sequence Diagram (Eraser.io syntax)
+// Actors, messages, control-flow blocks and activations
+
+type sequence
+
+User [icon: user, color: gray]
+Frontend [icon: layout, color: blue]
+Backend [icon: server, color: purple]
+DB [icon: database, color: green]
+
+User > Frontend: Sign in
+Frontend > Backend: POST /login
+Backend > DB: Verify credentials
+
+alt [label: valid] {
+  Backend > DB: Create session
+  Backend > Frontend: Access token
+  Frontend > User: Show dashboard
+}
+else [label: invalid] {
+  Backend > Frontend: 401 Unauthorized
+  Frontend > User: Show error
+}
+
+activate Backend
+Backend > Backend: Refresh tokens
+deactivate Backend`,
 
       'showcase.flow': `// FlowScript Showcase (Top-Down)
 // Every shape, text mode, connection type, colors, icons & groups

@@ -14,6 +14,7 @@ Live at [fs.gnkz.net](https://fs.gnkz.net) | GitHub Pages: [gunkaragoz.github.io
 - **Drag & drop** - Drag nodes and groups on the canvas; positions persist in the file as `pos: x,y`
 - **5000+ icons** - Full [Tabler Icons](https://tabler-icons.io) library loaded from CDN
 - **Dual layout engine** - Smart layout for standard and re-entrant (cross-group) flows
+- **Sequence diagrams** - Actors, messages, control-flow blocks and activation bars
 - **Works fully offline** - The layout engine is embedded; download the single HTML file and run it anywhere
 - **Local file system** - Direct folder access, your files stay on your machine
 - **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
@@ -48,6 +49,50 @@ Check Valid? > Save to DB : yes
 Check Valid? > End : no
 Save to DB > End
 ```
+
+---
+
+## Sequence Diagrams
+
+Add `type sequence` at the top of a `.flow` file (FlowScript also infers it from blocks or `activate`):
+
+```
+type sequence
+
+User [icon: user, color: gray]
+Frontend [icon: layout, color: blue]
+Backend [icon: server, color: purple]
+DB [icon: database, color: green]
+
+User > Frontend: Sign in
+Frontend > Backend: POST /login
+Backend > DB: Verify credentials
+
+alt [label: valid] {
+  Backend > DB: Create session
+  Backend > Frontend: Access token
+}
+else [label: invalid] {
+  Backend > Frontend: 401 Unauthorized
+}
+
+activate Backend
+Backend > Backend: Refresh tokens
+deactivate Backend
+```
+
+**Elements:**
+
+| Element | Syntax | Description |
+|---------|--------|-------------|
+| Actor | `Name [icon: user, color: blue]` | A column; order of first appearance sets column order |
+| Message | `A > B: text` | Arrow between two actors; the same arrows as flowcharts work (`>`, `<`, `<>`, `-`, `--`, `-->`) |
+| Self message | `A > A: text` | Loop back to the same actor |
+| Block | `loop`, `opt`, `alt`, `par`, `break` with `{ }` | Control-flow grouping, optional `[label: ...]` |
+| Block section | `else`, `and` | Connected branches of `alt` / `par` |
+| Activation | `activate A` / `deactivate A` | Bar on the actor's lifeline while it is active |
+
+Actors accept the usual `label`, `color`, `icon` and `shape` properties, and can be dragged — messages, lifelines, blocks and activation bars follow live.
 
 ---
 
