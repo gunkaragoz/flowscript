@@ -11,8 +11,10 @@ Live at [fs.gnkz.net](https://fs.gnkz.net) | GitHub Pages: [gunkaragoz.github.io
 ## Features
 
 - **Text-based syntax** - Write flowcharts like code, see results instantly
+- **Drag & drop** - Drag nodes and groups on the canvas; positions persist in the file as `pos: x,y`
 - **5000+ icons** - Full [Tabler Icons](https://tabler-icons.io) library loaded from CDN
 - **Dual layout engine** - Smart layout for standard and re-entrant (cross-group) flows
+- **Works fully offline** - The layout engine is embedded; download the single HTML file and run it anywhere
 - **Local file system** - Direct folder access, your files stay on your machine
 - **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
 - **Customizable** - 11 shapes, 20+ colors, text modes, and more
@@ -68,6 +70,7 @@ Node Name [shape: rectangle, color: blue, icon: server, text: wrap]
 | `icon` | Any [Tabler icon](https://tabler-icons.io) name | Icon to display in node |
 | `text` | `wrap`, `fit`, `clip` | Text rendering mode |
 | `label` | Any string | Custom label (different from node ID) |
+| `pos` | `x,y` (e.g. `pos: 120,80`) | Manual position override (written by dragging) |
 
 **Available Shapes:**
 
@@ -166,6 +169,25 @@ Group Name > Another Group : API calls
 Groups support the same `color` property as nodes.
 
 **Cross-group flows:** FlowScript automatically handles flows that alternate between groups (e.g., orchestrator calling external services and receiving results back). Satellite groups are positioned beside the primary group, aligned with their connection points.
+
+---
+
+### Dragging (Manual Positions)
+
+The canvas is interactive: drag any **node** to move it, or drag a **group** (its border or label) to move the whole group.
+
+```
+Step1 [pos: 120,80]        // node pinned at x:120, y:80
+Backend [color: blue, pos: 340,40] { ... }   // group pinned
+```
+
+- Dragging writes a `pos: x,y` property into the `.flow` text, so positions live in the file itself — they survive save, share, git, and version history
+- Positions snap to a 10px grid for tidy, readable `pos` values
+- Edges re-route **live while dragging** (attribute-only updates — no re-layout per frame)
+- Only dragged elements are pinned; everything else keeps auto-arranging (hybrid layout)
+- Groups automatically grow to keep containing their dragged members
+- Double-click a dragged node or group to release it back to full auto-layout
+- When any manual position exists, edges re-route orthogonally between the final node positions
 
 ---
 
@@ -380,6 +402,10 @@ FlowScript requires the File System Access API, currently supported in:
 - Opera 72+
 
 Firefox support is planned pending File System Access API implementation.
+
+### Offline / Single-File Use
+
+The layout engine (ELK.js) is embedded directly in `index.html`, so the app works fully offline: download the single HTML file, open it locally, and everything functions without a network connection. Fonts and the extended icon library load from CDN as optional enhancements — without a network, system fonts and the built-in icon set are used instead.
 
 ---
 
