@@ -15,6 +15,7 @@ Live at [fs.gnkz.net](https://fs.gnkz.net) | GitHub Pages: [gunkaragoz.github.io
 - **5000+ icons** - Full [Tabler Icons](https://tabler-icons.io) library loaded from CDN
 - **Dual layout engine** - Smart layout for standard and re-entrant (cross-group) flows
 - **Sequence diagrams** - Actors, messages, control-flow blocks and activation bars
+- **Org charts** - Indentation-based reporting lines, roles, draggable subtrees
 - **Works fully offline** - The layout engine is embedded; download the single HTML file and run it anywhere
 - **Local file system** - Direct folder access, your files stay on your machine
 - **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
@@ -93,6 +94,32 @@ deactivate Backend
 | Activation | `activate A` / `deactivate A` | Bar on the actor's lifeline while it is active |
 
 Actors accept the usual `label`, `color`, `icon` and `shape` properties, and can be dragged — messages, lifelines, blocks and activation bars follow live.
+
+---
+
+## Org Charts
+
+Add `type org` (optionally followed by a chart title) at the top of a `.flow` file. **Indentation is the reporting line** — the convention every org tool shares:
+
+```
+type org Acme Corp
+
+Alice Zhang [title: CEO, icon: user]
+  Bob Stone [title: VP Engineering]
+    Carol Diaz [title: Engineering Manager]
+      Dan Ray [title: Senior Engineer]
+      Eve Park [title: Engineer]
+  Grace Lee [title: VP Sales]
+    Heidi Roy [title: Account Executive]
+Ivan Petrov [title: Advisor, color: gray]
+```
+
+- Each card shows a **name** plus an optional `title:` (alias `role:`) beneath it
+- `color:`, `icon:`, `label:` and `pos:` work like everywhere else
+- Explicit reporting lines are also accepted: `Alice Zhang > Bob Stone`
+- Standard org-chart rules apply: **single parent** (the first one wins), multiple roots allowed, cycles ignored
+- Layout is a tidy top-down tree — leaves spread left to right and every manager is centred over their reports
+- **Dragging a manager moves their whole subtree**, and the reporting line from above re-routes to follow
 
 ---
 

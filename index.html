@@ -1213,6 +1213,19 @@ direction bottom  // alias for up</pre>
       </div>
 
       <div class="help-section">
+        <h3>Org Charts</h3>
+        <pre>type org Acme Corp     Type + optional chart title
+
+Alice [title: CEO]         Card: name + role
+  Bob [title: VP Eng]      Indentation is the
+    Carol [title: EM]      reporting line
+  Grace &gt; Heidi              Explicit: Parent &gt; Child
+
+Drag a manager and their
+whole subtree comes along.</pre>
+      </div>
+
+      <div class="help-section">
         <h3>Sequence Diagrams</h3>
         <pre>type sequence        Add at the top to force a sequence diagram
 
@@ -8897,8 +8910,9 @@ Process > End`;
     // ============================================
 
     function parse(source) {
-      // Sequence diagrams use their own syntax and renderer
+      // Sequence diagrams and org charts use their own syntax and renderers
       if (isSequenceSource(source)) return parseSequence(source);
+      if (isOrgSource(source)) return parseOrg(source);
 
       const nodes = new Map();
       const edges = [];
@@ -11346,6 +11360,356 @@ Process > End`;
       return { svg, width: W, height: H };
     }
 
+    // ============================================
+    // Org Charts
+    // ============================================
+
+    const ORG_CONFIG = {
+      cardMinWidth: 116,
+      cardMaxWidth: 190,
+      cardHeight: 46,
+      roleHeight: 14,
+      siblingGap: 26,
+      levelGap: 74,
+      busGap: 26,          // vertical space between a card bottom and the bus
+      pad: 40
+    };
+
+    // Org charts use indentation for the hierarchy (the convention every org
+    // tool shares) and accept explicit `Parent > Child` reporting lines too.
+    function isOrgSource(source) {
+      return /^\s*(type|diagram)\s+org(chart|-chart)?\b/im.test(source);
+    }
+
+    function parseOrg(source) {
+      const nodes = new Map();
+      const edges = [];
+      const stack = []; // { indent, id } for the indentation hierarchy
+      let title = null;
+
+      // Single-parent rule: the first parent found wins
+      function link(parent, child) {
+        if (!parent || !child || parent === child) return;
+        if (child.parent) return;
+        child.parent = parent.id;
+        parent.children.push(child.id);
+        edges.push({ source: parent.id, target: child.id, label: '', connectorType: '-', color: null });
+      }
+
+      function defineNode(text) {
+        const m = text.trim().match(/^([\s\S]*?)\s*(\[[^\]]*\])?\s*$/);
+        if (!m) return null;
+        let name = (m[1] || '').trim();
+        const propsStr = m[2] || '';
+        if (!name) return null;
+        if (name.startsWith('"') && name.endsWith('"')) name = name.slice(1, -1);
+        const props = parseProperties(propsStr);
+        const pos = parsePosFromProps(propsStr);
+        const role = props.title || props.role || null;
+        const existing = nodes.get(name);
+        if (existing) {
+          if (role && !existing.role) existing.role = role;
+          if (props.icon && !existing.icon) existing.icon = props.icon;
+          if (props.color && !existing.color) existing.color = resolvePropColor(props.color);
+          if (pos && !existing.pos) existing.pos = pos;
+          return existing;
+        }
+        const shapeKey = props.shape ? props.shape.toLowerCase() : 'rectangle';
+        const shapeInfo = shapeMap[shapeKey] || shapeMap.default;
+        const node = {
+          id: name,
+          label: props.label || name,
+          role,
+          color: resolvePropColor(props.color),
+          icon: props.icon,
+          pos,
+          shape: shapeInfo.shape,
+          shapeRadius: shapeInfo.radius,
+          parent: null,
+          children: []
+        };
+        nodes.set(name, node);
+        return node;
+      }
+
+      for (const raw of source.split('\n')) {
+        const line = raw.replace(/\s+$/, '');
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) continue;
+
+        // `type org Acme Corp` — an optional chart title follows the keyword
+        const typeMatch = trimmed.match(/^(type|diagram)\s+(org|orgchart|org-chart)\b\s*(.*)$/i);
+        if (typeMatch) {
+          const t = (typeMatch[3] || '').trim();
+          if (t) title = t;
+          continue;
+        }
+        if (/^(direction|colorMode|styleMode|typeface)\s+/i.test(trimmed)) continue;
+
+        const indent = (line.match(/^[\t ]*/) || [''])[0].replace(/\t/g, '  ').length;
+
+        // Explicit reporting line
+        if (hasConnectorChar(trimmed) || trimmed.includes('-->')) {
+          const parts = splitConnector(trimmed, '>');
+          if (parts.length === 2) link(defineNode(parts[0]), defineNode(parts[1]));
+          continue;
+        }
+
+        // Indented node line — the deepest shallower line above is the manager
+        const node = defineNode(trimmed);
+        if (!node) continue;
+        while (stack.length && stack[stack.length - 1].indent >= indent) stack.pop();
+        if (stack.length) {
+          const parentNode = nodes.get(stack[stack.length - 1].id);
+          if (parentNode) link(parentNode, node);
+        }
+        stack.push({ indent, id: node.id });
+      }
+
+      return {
+        type: 'org',
+        title,
+        nodes: Array.from(nodes.values()),
+        edges,
+        groups: [],
+        groupNames: new Set(),
+        direction: 'down'
+      };
+    }
+
+    // Tidy top-down tree: leaves are placed left to right, each manager is
+    // centred over the span of its reports, and subtrees are separated.
+    function layoutOrg(parsed) {
+      const C = ORG_CONFIG;
+      const list = parsed.nodes;
+      const cards = new Map();
+
+      list.forEach(n => {
+        const iconInfo = getIconInfo(n.icon);
+        const hasIcon = !!(iconInfo && iconInfo.paths);
+        const nameLines = wrapText(n.label, C.cardMaxWidth - 26);
+        const roleLines = n.role ? wrapText(n.role, C.cardMaxWidth - 26) : [];
+        const nameW = nameLines.length ? Math.max(...nameLines.map(l => l.length * 6.8)) : 0;
+        const roleW = roleLines.length ? Math.max(...roleLines.map(l => l.length * 5.6)) : 0;
+        const w = Math.max(C.cardMinWidth, Math.min(C.cardMaxWidth, Math.max(nameW, roleW) + (hasIcon ? 30 : 0) + 26));
+        const h = C.cardHeight + (n.role ? C.roleHeight : 0);
+        cards.set(n.id, {
+          id: n.id, node: n, w, h, nameLines, roleLines, hasIcon, iconInfo,
+          cx: 0, y: 0, depth: 0, parent: n.parent
+        });
+      });
+
+      // Depth from the roots
+      const roots = list.filter(n => !n.parent);
+      const queue = roots.map(n => ({ id: n.id, depth: 0 }));
+      let maxDepth = 0;
+      const seen = new Set();
+      while (queue.length) {
+        const { id, depth } = queue.shift();
+        if (seen.has(id)) continue; // guard against cycles
+        seen.add(id);
+        const card = cards.get(id);
+        if (!card) continue;
+        card.depth = depth;
+        maxDepth = Math.max(maxDepth, depth);
+        (card.node.children || []).forEach(cid => queue.push({ id: cid, depth: depth + 1 }));
+      }
+
+      // Vertical bands per level
+      const levelH = [];
+      cards.forEach(c => { levelH[c.depth] = Math.max(levelH[c.depth] || 0, c.h); });
+      const levelY = [];
+      let acc = 0;
+      for (let d = 0; d <= maxDepth; d++) {
+        levelY[d] = acc;
+        acc += (levelH[d] || 0) + C.levelGap;
+      }
+
+      // Horizontal placement
+      const subLeft = new Map(), subRight = new Map();
+      const shiftX = (id, delta) => {
+        const c = cards.get(id);
+        if (!c) return;
+        c.cx += delta;
+        if (subLeft.has(id)) { subLeft.set(id, subLeft.get(id) + delta); subRight.set(id, subRight.get(id) + delta); }
+        (c.node.children || []).forEach(cid => shiftX(cid, delta));
+      };
+      const shiftY = (id, delta) => {
+        const c = cards.get(id);
+        if (!c) return;
+        c.y += delta;
+        (c.node.children || []).forEach(cid => shiftY(cid, delta));
+      };
+      const measureBounds = id => {
+        const c = cards.get(id);
+        let left = c.cx - c.w / 2, right = c.cx + c.w / 2;
+        (c.node.children || []).forEach(cid => {
+          if (subLeft.has(cid)) {
+            left = Math.min(left, subLeft.get(cid));
+            right = Math.max(right, subRight.get(cid));
+          }
+        });
+        subLeft.set(id, left);
+        subRight.set(id, right);
+      };
+      let cursor = 0;
+      const place = id => {
+        const c = cards.get(id);
+        if (!c) return;
+        const kids = c.node.children || [];
+        kids.forEach(place);
+        if (!kids.length) {
+          c.cx = cursor + c.w / 2;
+          cursor += c.w + C.siblingGap;
+        } else {
+          for (let i = 1; i < kids.length; i++) {
+            const minLeft = subRight.get(kids[i - 1]) + C.siblingGap;
+            if (subLeft.get(kids[i]) < minLeft) shiftX(kids[i], minLeft - subLeft.get(kids[i]));
+          }
+          c.cx = (subLeft.get(kids[0]) + subRight.get(kids[kids.length - 1])) / 2;
+        }
+        c.y = levelY[c.depth];
+        measureBounds(id);
+      };
+      roots.forEach(n => place(n.id));
+      // Any card unreachable from a root still needs a position
+      cards.forEach(c => { if (!seen.has(c.id)) { c.cx = cursor + c.w / 2; c.y = levelY[c.depth]; cursor += c.w + C.siblingGap; } });
+
+      // Pinned cards drag their whole subtree with them
+      list.forEach(n => {
+        const c = cards.get(n.id);
+        if (!c || !n.pos) return;
+        const dcx = (n.pos.x + c.w / 2) - c.cx;
+        const dy = n.pos.y - c.y;
+        if (dcx) shiftX(n.id, dcx);
+        if (dy) shiftY(n.id, dy);
+      });
+
+      // Reporting connectors
+      const links = [];
+      list.forEach(n => {
+        const kids = n.children || [];
+        if (!kids.length) return;
+        const p = cards.get(n.id);
+        const busY = p.y + p.h + C.busGap;
+        kids.forEach(cid => {
+          const ch = cards.get(cid);
+          links.push({ parentId: n.id, childId: cid, busY });
+        });
+      });
+
+      // Bounds
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      cards.forEach(c => {
+        xMin = Math.min(xMin, c.cx - c.w / 2);
+        xMax = Math.max(xMax, c.cx + c.w / 2);
+        yMin = Math.min(yMin, c.y);
+        yMax = Math.max(yMax, c.y + c.h);
+      });
+      if (!isFinite(xMin)) { xMin = 0; xMax = 200; yMin = 0; yMax = 100; }
+      const titleH = parsed.title ? 38 : 0;
+      const width = (xMax - xMin) + C.pad * 2;
+      const height = (yMax - yMin) + C.pad * 2 + titleH;
+      const ox = C.pad - xMin;
+      const oy = C.pad + titleH - yMin;
+
+      return {
+        cards, links, title: parsed.title, titleH, ox, oy, width, height,
+        cardById: new Map(Array.from(cards.values()).map(c => [c.id, c])),
+        anyPin: list.some(n => n.pos)
+      };
+    }
+
+    function renderOrg(laid, parsed) {
+      const style = getComputedStyle(document.body);
+      const nodeFill = style.getPropertyValue('--node-fill').trim();
+      const nodeStroke = style.getPropertyValue('--node-stroke').trim();
+      const nodeText = style.getPropertyValue('--node-text').trim();
+      const edgeStroke = style.getPropertyValue('--edge-stroke').trim();
+      const textDim = style.getPropertyValue('--text-dim').trim();
+
+      const C = ORG_CONFIG;
+      const { ox, oy } = laid;
+      const X = c => c.cx + ox;
+      const Y = c => c.y + oy;
+
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${laid.width} ${laid.height}">`;
+
+      if (laid.title) {
+        svg += `<text x="${laid.width / 2}" y="${C.pad + 16}" text-anchor="middle" fill="${nodeText}" font-size="16" font-weight="600" font-family="DM Sans,sans-serif">${esc(laid.title)}</text>`;
+      }
+
+      // Reporting lines: a stub down from the manager, a horizontal bus, and a
+      // drop into each report
+      const linksByParent = new Map();
+      laid.links.forEach(l => {
+        if (!linksByParent.has(l.parentId)) linksByParent.set(l.parentId, []);
+        linksByParent.get(l.parentId).push(l);
+      });
+
+      linksByParent.forEach((links, parentId) => {
+        const p = laid.cardById.get(parentId);
+        if (!p) return;
+        const pb = Y(p) + p.h;
+        const pcx = X(p);
+        const busY = pb + C.busGap;
+        const childCxs = links.map(l => X(laid.cardById.get(l.childId)));
+        const minCx = Math.min(...childCxs), maxCx = Math.max(...childCxs);
+        svg += `<path data-org-stub="${esc(parentId)}" d="M ${pcx} ${pb} L ${pcx} ${busY}" fill="none" stroke="${edgeStroke}" stroke-width="1.5"/>`;
+        if (maxCx - minCx > 0.5) {
+          svg += `<path data-org-bus="${esc(parentId)}" d="M ${minCx} ${busY} L ${maxCx} ${busY}" fill="none" stroke="${edgeStroke}" stroke-width="1.5"/>`;
+        }
+        links.forEach(l => {
+          const ch = laid.cardById.get(l.childId);
+          if (!ch) return;
+          const ccx = X(ch), ctop = Y(ch);
+          svg += `<path data-org-drop="${esc(l.childId)}" d="M ${ccx} ${busY} L ${ccx} ${ctop}" fill="none" stroke="${edgeStroke}" stroke-width="1.5"/>`;
+        });
+      });
+
+      // Cards
+      laid.cards.forEach(c => {
+        const n = c.node;
+        const x = X(c) - c.w / 2, y = Y(c);
+        const fill = n.color || nodeFill;
+        const textColor = n.color ? (isDarkColor(n.color) ? '#ffffff' : '#1a1a1a') : nodeText;
+        svg += `<g class="fs-node" data-node-id="${esc(n.id)}">`;
+        svg += renderShape(n.shape, x, y, c.w, c.h, fill, nodeStroke);
+        const textX = c.hasIcon ? x + 38 : x + c.w / 2;
+        const anchor = c.hasIcon ? 'start' : 'middle';
+        if (c.hasIcon && c.iconInfo) {
+          const attrs = c.iconInfo.filled
+            ? `fill="${textColor}" stroke="none"`
+            : `fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+          svg += `<g transform="translate(${x + 12},${y + c.h / 2 - 11})"><svg width="22" height="22" viewBox="0 0 24 24" ${attrs}>`;
+          c.iconInfo.paths.forEach(d => { svg += `<path d="${d}"/>`; });
+          svg += `</svg></g>`;
+        }
+        const nameY = n.role ? y + 22 : y + c.h / 2 + 4;
+        c.nameLines.forEach((line, i) => {
+          svg += `<text x="${textX}" y="${nameY + i * 14}" text-anchor="${anchor}" fill="${textColor}" font-size="12" font-weight="600" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+        });
+        if (c.roleLines.length) {
+          const roleY = nameY + c.nameLines.length * 14 + 2;
+          c.roleLines.forEach((line, i) => {
+            svg += `<text x="${textX}" y="${roleY + i * 12}" text-anchor="${anchor}" fill="${textColor}" font-size="10.5" font-family="DM Sans,sans-serif" opacity="0.75">${esc(line)}</text>`;
+          });
+        }
+        svg += `</g>`;
+      });
+
+      svg += `</svg>`;
+
+      state.lastRender = {
+        ox, oy, anyPin: laid.anyPin,
+        nodes: new Map(Array.from(laid.cards.values()).map(c => [c.id, { x: X(c) - c.w / 2, y: Y(c), w: c.w, h: c.h }])),
+        groups: [],
+        org: laid
+      };
+
+      return { svg, width: laid.width, height: laid.height };
+    }
+
     async function updateDiagram() {
       const source = editor.value;
 
@@ -11359,7 +11723,7 @@ Process > End`;
         const parsed = parse(source);
         state.lastParsed = parsed;
 
-        // Sequence diagrams have their own layout + renderer
+        // Sequence diagrams and org charts have their own layout + renderer
         if (parsed.type === 'sequence') {
           if (parsed.actors.length === 0) {
             canvas.innerHTML = '';
@@ -11371,6 +11735,20 @@ Process > End`;
           canvas.innerHTML = svg;
           canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
           setStatus(`${parsed.actors.length} actors, ${parsed.messages.length} messages`, false);
+          return;
+        }
+
+        if (parsed.type === 'org') {
+          if (parsed.nodes.length === 0) {
+            canvas.innerHTML = '';
+            setStatus('Ready', false);
+            return;
+          }
+          const laid = layoutOrg(parsed);
+          const { svg, width, height } = renderOrg(laid, parsed);
+          canvas.innerHTML = svg;
+          canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+          setStatus(`${parsed.nodes.length} people`, false);
           return;
         }
 
@@ -11656,7 +12034,7 @@ Process > End`;
       clearTimeout(updateTimer); // don't let a pending re-render kill the drag
       const parsed = state.lastParsed;
       const lr = state.lastRender;
-      if (!parsed || !state.lastElkResult || !lr) return;
+      if (!parsed || !lr) return;
 
       // Sequence messages are always manually routed, so no re-render is
       // needed — just cache the elements the per-frame updater will touch.
@@ -11676,6 +12054,63 @@ Process > End`;
         }
         return;
       }
+
+      // Org charts: cache the dragged card's subtree and its manager's connector
+      if (parsed.type === 'org') {
+        const laid = lr.org;
+        if (laid) {
+          // Descendants (and the buses hanging off every subtree member)
+          const subtreeIds = new Set();
+          const collect = id => {
+            if (subtreeIds.has(id)) return;
+            subtreeIds.add(id);
+            const n = parsed.nodes.find(x => x.id === id);
+            (n && n.children || []).forEach(collect);
+          };
+          collect(drag.id);
+          const subtreeEls = [drag.elements[0]];
+          subtreeIds.forEach(id => {
+            if (id === drag.id) return;
+            const g = nodeGElement(id);
+            if (g) subtreeEls.push(g);
+          });
+          subtreeIds.forEach(id => {
+            const bus = canvas.querySelector('path[data-org-bus="' + CSS.escape(id) + '"]');
+            const stub = canvas.querySelector('path[data-org-stub="' + CSS.escape(id) + '"]');
+            // The drop *into* the dragged card is re-routed by parentLink instead,
+            // but the lines hanging off it move with the subtree like everything else
+            const drop = id === drag.id ? null : canvas.querySelector('path[data-org-drop="' + CSS.escape(id) + '"]');
+            if (bus) subtreeEls.push(bus);
+            if (stub) subtreeEls.push(stub);
+            if (drop) subtreeEls.push(drop);
+          });
+          drag.elements = subtreeEls;
+          drag.orgEls = { subtree: subtreeEls, subtreeIds };
+
+          // The manager's reporting line into the dragged card
+          const me = laid.cardById.get(drag.id);
+          const parentId = me && me.parent;
+          if (parentId) {
+            const manager = laid.cardById.get(parentId);
+            const childIds = manager ? (manager.node.children || []) : [];
+            drag.orgEls.parentLink = {
+              parentId,
+              childIds,
+              stub: canvas.querySelector('path[data-org-stub="' + CSS.escape(parentId) + '"]'),
+              bus: canvas.querySelector('path[data-org-bus="' + CSS.escape(parentId) + '"]'),
+              drops: childIds.map(cid => ({
+                id: cid,
+                el: canvas.querySelector('path[data-org-drop="' + CSS.escape(cid) + '"]')
+              })).filter(d => d.el)
+            };
+          }
+        }
+        return;
+      }
+
+      // Flowcharts are the only type that needs the cached ELK result, and
+      // only to switch the view from ELK routing to manual routing
+      if (!state.lastElkResult) return;
 
       if (!lr.anyPin) {
         const pinX = drag.base.x - lr.ox, pinY = drag.base.y - lr.oy;
@@ -11741,6 +12176,12 @@ Process > End`;
       // Sequence diagrams: re-route between the live actor columns
       if (state.lastParsed && state.lastParsed.type === 'sequence') {
         runSequenceFrame(d);
+        return;
+      }
+
+      // Org charts: drag a card and its reports come along
+      if (state.lastParsed && state.lastParsed.type === 'org') {
+        runOrgFrame(d);
         return;
       }
 
@@ -11822,6 +12263,43 @@ Process > End`;
       drag.raf = 0;
       drag.elements.forEach(el => el.classList.add('fs-drag-active'));
       runDragFrame(drag);
+    }
+
+    // Live update for org charts: the dragged card and its whole subtree move
+    // together, and the reporting line from the manager re-routes to follow.
+    function runOrgFrame(d) {
+      const laid = state.lastRender && state.lastRender.org;
+      if (!laid || !d.orgEls || !d.lastDelta) return;
+      const { dx, dy } = d.lastDelta;
+      const C = ORG_CONFIG;
+
+      // Subtree cards and the buses hanging off them
+      d.orgEls.subtree.forEach(el => el.setAttribute('transform', `translate(${dx},${dy})`));
+
+      // The manager's connector into the moved card
+      const link = d.orgEls.parentLink;
+      if (!link) return; // a root card has no connector above it
+      const liveCx = id => {
+        const c = laid.cardById.get(id);
+        return c.cx + laid.ox + (d.orgEls.subtreeIds.has(id) ? dx : 0);
+      };
+      const liveTop = id => {
+        const c = laid.cardById.get(id);
+        return c.y + laid.oy + (d.orgEls.subtreeIds.has(id) ? dy : 0);
+      };
+      const p = laid.cardById.get(link.parentId);
+      if (!p) return;
+      const pcx = p.cx + laid.ox;
+      const pb = p.y + laid.oy + p.h;
+      const busY = pb + C.busGap;
+      const childCxs = link.childIds.map(liveCx);
+      const minCx = Math.min(...childCxs), maxCx = Math.max(...childCxs);
+      if (link.stub) link.stub.setAttribute('d', `M ${pcx} ${pb} L ${pcx} ${busY}`);
+      if (link.bus) link.bus.setAttribute('d', `M ${minCx} ${busY} L ${maxCx} ${busY}`);
+      link.drops.forEach(drop => {
+        const ccx = liveCx(drop.id);
+        drop.el.setAttribute('d', `M ${ccx} ${busY} L ${ccx} ${liveTop(drop.id)}`);
+      });
     }
 
     // Live update for sequence diagrams: lifelines follow their column, messages
@@ -11976,7 +12454,7 @@ Process > End`;
       const gEl = e.target.closest && e.target.closest('g.fs-node, g.fs-group');
       if (!gEl || !state.lastParsed) return;
       if (gEl.classList.contains('fs-node')) {
-        // Sequence diagrams name them actors; flowcharts name them nodes
+        // Sequence diagrams name them actors; flowcharts and org charts use nodes
         const list = state.lastParsed.actors || state.lastParsed.nodes;
         const item = list.find(n => n.id === gEl.dataset.nodeId);
         if (item && item.pos) clearNodePosInText(item.id);
@@ -12564,6 +13042,23 @@ Cloud [color: orange] {
 Frontend > Backend: REST API
 Backend > Cloud: async jobs
 Cloud > Frontend: static assets`,
+
+      'org-chart.flow': `// Org Chart (indentation = reporting line)
+// Person cards with a role, plus the usual color/icon/label properties
+
+type org Acme Corp
+
+Alice Zhang [title: CEO, icon: user]
+  Bob Stone [title: VP Engineering, icon: code]
+    Carol Diaz [title: Engineering Manager]
+      Dan Ray [title: Senior Engineer]
+      Eve Park [title: Engineer]
+    Frank Wu [title: Platform Lead]
+  Grace Lee [title: VP Sales, icon: chart]
+    Heidi Roy [title: Account Executive]
+Ivan Petrov [title: Advisor, color: gray]
+
+// Drag any card and its reports come along`,
 
       'login-sequence.flow': `// Sequence Diagram (Eraser.io syntax)
 // Actors, messages, control-flow blocks and activations
