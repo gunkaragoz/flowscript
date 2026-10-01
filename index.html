@@ -1004,6 +1004,12 @@
                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
               </svg>
             </button>
+            <button class="sidebar-btn" id="resetSamplesBtn" title="Restore the built-in sample files" style="display: none;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4v6h6"/><path d="M20 20v-6h-6"/>
+                <path d="M20 9A8 8 0 006.3 5.3L4 8"/><path d="M4 15a8 8 0 0013.7 3.7L20 16"/>
+              </svg>
+            </button>
           </div>
         </div>
         <div class="file-tree" id="fileTree">
@@ -11798,6 +11804,31 @@ Process > End`;
     document.getElementById('newFileBtn').addEventListener('click', showNewFileModal);
     document.getElementById('createFirstBtn')?.addEventListener('click', showNewFileModal);
     document.getElementById('refreshBtn').addEventListener('click', refreshFileTree);
+    document.getElementById('resetSamplesBtn')?.addEventListener('click', () => {
+      if (!state.demoMode) return;
+      let restored = 0;
+      Object.entries(sampleFiles).forEach(([name, content]) => {
+        const existing = state.files.get(name);
+        if (existing && existing.content === content) return; // already pristine
+        if (existing) {
+          existing.content = content;
+          existing.modified = false;
+          existing.lastUpdated = Date.now();
+        } else {
+          state.files.set(name, { handle: null, content, modified: false, lastUpdated: Date.now() });
+        }
+        restored++;
+      });
+      if (!restored) {
+        showToast('Samples already up to date');
+        return;
+      }
+      // Re-open the current file so the editor matches the restored content
+      if (state.currentFile) openDemoFile(state.currentFile);
+      renderDemoFileTree();
+      saveToLocalStorage();
+      showToast(`Restored ${restored} sample file${restored > 1 ? 's' : ''}`);
+    });
     document.getElementById('helpBtn').addEventListener('click', () => document.getElementById('helpModal').classList.add('active'));
 
     document.getElementById('themeBtn').addEventListener('click', () => {
@@ -12519,6 +12550,8 @@ Ship Order > Complete`
       // Set up in-memory demo mode
       state.directoryHandle = null;
       state.demoMode = true;
+      const resetBtn = document.getElementById('resetSamplesBtn');
+      if (resetBtn) resetBtn.style.display = '';
       
       // Try to load from localStorage first
       const saved = loadFromLocalStorage();
