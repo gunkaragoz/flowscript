@@ -875,6 +875,33 @@
       line-height: 1.5;
       overflow-x: auto;
     }
+
+    /* Instant tooltips for icon buttons. The browser's native title tooltip
+       waits about a second before appearing, which is far too slow for
+       icon-only controls, so [data-tip] drives this layer instead. */
+    .fs-tip {
+      position: fixed;
+      z-index: 1200;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 11px;
+      line-height: 1.25;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      transform: translateY(2px);
+      transition: opacity 80ms ease-out, transform 80ms ease-out;
+    }
+
+    .fs-tip.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
   </style>
   <script defer data-domain="fs.gnkz.net" src="https://plausible.gnkz.net/js/script.file-downloads.outbound-links.js"></script>
 </head>
@@ -897,20 +924,20 @@
         </div>
       </div>
       <div class="header-actions">
-        <button class="btn" id="openFolderHeaderBtn" title="Open project folder (Ctrl+O)" style="display:none;">
+        <button class="btn" id="openFolderHeaderBtn" data-tip="Open project folder (Ctrl+O)" style="display:none;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
           </svg>
           Open Folder
         </button>
-        <button class="btn btn-ghost" id="helpBtn" title="Help">
+        <button class="btn btn-ghost" id="helpBtn" data-tip="Help">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"/>
             <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/>
           </svg>
         </button>
         <div style="position:relative;">
-          <button class="btn btn-ghost" id="paletteBtn" title="Color palette">
+          <button class="btn btn-ghost" id="paletteBtn" data-tip="Color palette">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="13.5" cy="6.5" r="2"/>
               <circle cx="17.5" cy="10.5" r="2"/>
@@ -936,15 +963,15 @@
             <div class="palette-swatches" id="paletteSwatches"></div>
           </div>
         </div>
-        <button class="btn btn-ghost" id="themeBtn" title="Toggle theme">
+        <button class="btn btn-ghost" id="themeBtn" data-tip="Toggle theme">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="5"/>
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
           </svg>
         </button>
         <div class="btn-group">
-          <button class="btn" id="exportSvgBtn" title="Export diagram as SVG">SVG</button>
-          <button class="btn" id="exportPngBtn" title="Export diagram as PNG">PNG</button>
+          <button class="btn" id="exportSvgBtn" data-tip="Export diagram as SVG">SVG</button>
+          <button class="btn" id="exportPngBtn" data-tip="Export diagram as PNG">PNG</button>
         </div>
       </div>
     </header>
@@ -977,34 +1004,34 @@
         <div class="sidebar-header">
           <span class="sidebar-title">Files</span>
           <div class="sidebar-actions">
-            <button class="sidebar-btn" id="openFolderSidebarBtn" title="Open folder" style="display:none;">
+            <button class="sidebar-btn" id="openFolderSidebarBtn" data-tip="Open folder" style="display:none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2v11z"/>
               </svg>
             </button>
-            <button class="sidebar-btn active" id="sortNameBtn" data-sort="name" title="Sort by name">
+            <button class="sidebar-btn active" id="sortNameBtn" data-sort="name" data-tip="Sort by name">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M3 6h12M3 12h9M3 18h6M18 6v12M15 15l3 3 3-3"/>
               </svg>
             </button>
-            <button class="sidebar-btn" id="sortRecentBtn" data-sort="recent" title="Sort by recent">
+            <button class="sidebar-btn" id="sortRecentBtn" data-sort="recent" data-tip="Sort by recent">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>
               </svg>
             </button>
             <div style="width: 1px; height: 16px; background: var(--border); margin: 0 2px;"></div>
-            <button class="sidebar-btn" id="newFileBtn" title="New file">
+            <button class="sidebar-btn" id="newFileBtn" data-tip="New file">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M12 5v14M5 12h14"/>
               </svg>
             </button>
-            <button class="sidebar-btn" id="refreshBtn" title="Refresh">
+            <button class="sidebar-btn" id="refreshBtn" data-tip="Refresh">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 4v6h-6M1 20v-6h6"/>
                 <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
               </svg>
             </button>
-            <button class="sidebar-btn" id="resetSamplesBtn" title="Restore the built-in sample files" style="display: none;">
+            <button class="sidebar-btn" id="resetSamplesBtn" data-tip="Restore the built-in sample files" style="display: none;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 14l-4-4m0 0l4-4m-4 4h10a4 4 0 010 4v3"/>
               </svg>
@@ -1047,7 +1074,7 @@ Process > End"></textarea>
             <span id="statusText">Ready</span>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
-            <button class="btn" id="versionsBtn" title="Version History" style="padding: 4px 8px; font-size: 11px;">
+            <button class="btn" id="versionsBtn" data-tip="Version History" style="padding: 4px 8px; font-size: 11px;">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;">
                 <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
@@ -1067,20 +1094,20 @@ Process > End"></textarea>
         </div>
         <div class="canvas-controls">
           <div class="control-group">
-            <button class="canvas-btn" id="zoomOutBtn" title="Zoom out">
+            <button class="canvas-btn" id="zoomOutBtn" data-tip="Zoom out">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/>
               </svg>
             </button>
             <span class="zoom-display" id="zoomDisplay">100%</span>
-            <button class="canvas-btn" id="zoomInBtn" title="Zoom in">
+            <button class="canvas-btn" id="zoomInBtn" data-tip="Zoom in">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6M11 8v6"/>
               </svg>
             </button>
           </div>
           <div class="control-group">
-            <button class="canvas-btn" id="fitBtn" title="Fit to view">
+            <button class="canvas-btn" id="fitBtn" data-tip="Fit to view">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M8 3H5a2 2 0 00-2 2v3M21 8V5a2 2 0 00-2-2h-3M3 16v3a2 2 0 002 2h3M16 21h3a2 2 0 002-2v-3"/>
               </svg>
@@ -8749,7 +8776,7 @@ module.exports = Worker;
             </svg>
             <span class="file-name">${name}</span>
             ${state.sortBy === 'recent' && timeAgo && !fileData?.modified ? `<span class="file-time">${timeAgo}</span>` : ''}
-            <button class="file-delete-btn" data-delete="${name}" title="Delete file">
+            <button class="file-delete-btn" data-delete="${name}" data-tip="Delete file">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="3,6 5,6 21,6"/>
                 <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
@@ -13126,6 +13153,69 @@ Process > End`;
     // UI Events
     // ============================================
 
+    // ============================================
+    // Instant tooltips
+    // ============================================
+    // A single shared tooltip driven by [data-tip], so icon buttons give
+    // feedback on hover instead of waiting for the native title tooltip.
+
+    (function initTooltips() {
+      const tip = document.createElement('div');
+      tip.className = 'fs-tip';
+      tip.setAttribute('role', 'presentation');
+      document.body.appendChild(tip);
+      let visible = null;
+
+      function show(target) {
+        const text = target.getAttribute('data-tip');
+        if (!text) return;
+        tip.textContent = text;
+        tip.classList.add('show');
+        // Icon-only buttons still need an accessible name
+        if (!target.hasAttribute('aria-label')) target.setAttribute('aria-label', text);
+
+        const r = target.getBoundingClientRect();
+        const box = tip.getBoundingClientRect();
+        // Prefer above the control; flip below when there is no room
+        let top = r.top - box.height - 7;
+        if (top < 8) top = r.bottom + 7;
+        let left = r.left + r.width / 2 - box.width / 2;
+        left = Math.max(8, Math.min(left, window.innerWidth - box.width - 8));
+        tip.style.top = Math.round(top) + 'px';
+        tip.style.left = Math.round(left) + 'px';
+        visible = target;
+      }
+
+      function hide() {
+        tip.classList.remove('show');
+        visible = null;
+      }
+
+      const tipTarget = e => (e.target.closest ? e.target.closest('[data-tip]') : null);
+
+      document.addEventListener('mouseover', e => {
+        const t = tipTarget(e);
+        if (t) {
+          if (t !== visible) show(t);
+        } else if (visible) {
+          hide();
+        }
+      });
+      document.addEventListener('mouseout', e => {
+        const t = tipTarget(e);
+        if (visible && (!t || !t.contains(e.relatedTarget))) hide();
+      });
+      // Keyboard focus gets the same hint
+      document.addEventListener('focusin', e => {
+        const t = tipTarget(e);
+        if (t) show(t);
+      });
+      document.addEventListener('focusout', hide);
+      // A moving page would leave the tooltip stranded
+      window.addEventListener('scroll', hide, true);
+      window.addEventListener('resize', hide);
+    })();
+
     document.getElementById('openFolderBtn').addEventListener('click', openFolder);
     document.getElementById('openFolderHeaderBtn').addEventListener('click', openFolder);
     document.getElementById('openFolderSidebarBtn').addEventListener('click', openFolder);
@@ -14068,7 +14158,7 @@ Ship Order > Complete`
           </svg>
           <span class="file-name">${name}</span>
           ${state.sortBy === 'recent' && timeAgo && !fileData?.modified ? `<span class="file-time">${timeAgo}</span>` : ''}
-          <button class="file-delete-btn" data-delete="${name}" title="Delete file">
+          <button class="file-delete-btn" data-delete="${name}" data-tip="Delete file">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="3,6 5,6 21,6"/>
               <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
