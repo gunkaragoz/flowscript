@@ -16,6 +16,7 @@ Live at [fs.gnkz.net](https://fs.gnkz.net) | GitHub Pages: [gunkaragoz.github.io
 - **Dual layout engine** - Smart layout for standard and re-entrant (cross-group) flows
 - **Sequence diagrams** - Actors, messages, control-flow blocks and activation bars
 - **Org charts** - Indentation-based reporting lines, roles, draggable subtrees
+- **ER diagrams** - Entities with attributes, PK/FK keys, crow's-foot cardinalities
 - **Works fully offline** - The layout engine is embedded; download the single HTML file and run it anywhere
 - **Local file system** - Direct folder access, your files stay on your machine
 - **Version history** - Auto-saves every 5 minutes, manual snapshots with descriptions
@@ -120,6 +121,43 @@ Ivan Petrov [title: Advisor, color: gray]
 - Standard org-chart rules apply: **single parent** (the first one wins), multiple roots allowed, cycles ignored
 - Layout is a tidy top-down tree — leaves spread left to right and every manager is centred over their reports
 - **Dragging a manager moves their whole subtree**, and the reporting line from above re-routes to follow
+
+---
+
+## Entity Relationship Diagrams
+
+Add `type er` (aliases: `erd`, `entity-relationship`) at the top of a `.flow` file.
+
+```
+type er
+
+CUSTOMER [icon: user]
+  id int PK
+  name string
+  email string UK
+
+ORDER
+  id int PK
+  customer_id int FK
+  total decimal
+
+CUSTOMER ||--o{ ORDER : places
+```
+
+**Entities & attributes:** an unindented line defines an entity; indented lines under it are its attributes, written `name type KEY "comment"`. Primary keys are underlined, and `PK` / `FK` / `UK` badges are shown (comma-separate for combinations). The Mermaid order `type name PK` works too, so existing ER snippets paste in unchanged.
+
+**Cardinalities** use Mermaid's notation, so crow's feet render the way you expect:
+
+| Marker | Left | Right | Meaning |
+|--------|------|-------|---------|
+| `\|o` | `o\|` | zero or one |
+| `\|\|` | `\|\|` | exactly one |
+| `}o` | `o{` | zero or more |
+| `}\|` | `\|{` | one or more |
+
+A short form is also accepted: `CUSTOMER 1-many ORDER : places` (`1-1`, `1-many`, `many-1`, `many-many`). The middle `--` means identifying (solid) and `..` non-identifying (dashed).
+
+Entities are placed automatically and are draggable — relations re-route around the boxes, with their crow's feet and labels following.
 
 ---
 

@@ -1213,6 +1213,19 @@ direction bottom  // alias for up</pre>
       </div>
 
       <div class="help-section">
+        <h3>ER Diagrams</h3>
+        <pre>type er              Type
+
+CUSTOMER [icon: user]     Entity (indented lines
+  id int PK               are its attributes)
+  name string
+
+CUSTOMER ||--o{ ORDER : places
+       ^^^^^^  ^^       Cardinality (crow's foot)
+CUSTOMER 1-many ORDER     Short form also works</pre>
+      </div>
+
+      <div class="help-section">
         <h3>Org Charts</h3>
         <pre>type org Acme Corp     Type + optional chart title
 
@@ -8910,9 +8923,10 @@ Process > End`;
     // ============================================
 
     function parse(source) {
-      // Sequence diagrams and org charts use their own syntax and renderers
+      // Sequence diagrams, org charts and ER diagrams have their own renderers
       if (isSequenceSource(source)) return parseSequence(source);
       if (isOrgSource(source)) return parseOrg(source);
+      if (isErSource(source)) return parseEr(source);
 
       const nodes = new Map();
       const edges = [];
@@ -10279,19 +10293,52 @@ Process > End`;
       };
     }
 
-    // Put a label on the longest segment of a path, where there is room for it
-    function labelPointForPath(pts) {
-      let best = 1, bestLen = -1;
+    // Put a label where there is room for it. Candidates along every segment
+    // (longest first) are scored by how much node box they overlap, so a label
+    // never lands on top of a node — which is easy to do when a route has been
+    // pushed around an obstacle.
+    function labelPointForPath(pts, dim, obstacles) {
+      const w = dim ? dim.width + 6 : 0;
+      const h = dim ? dim.height + 6 : 0;
+      const overlapAt = (x, y) => {
+        if (!w || !h || !obstacles || !obstacles.length) return 0;
+        let area = 0;
+        for (const o of obstacles) {
+          const ox = Math.min(x + w / 2, o.x + o.w) - Math.max(x - w / 2, o.x);
+          const oy = Math.min(y + h / 2, o.y + o.h) - Math.max(y - h / 2, o.y);
+          if (ox > 0 && oy > 0) area += ox * oy;
+        }
+        return area;
+      };
+
+      const candidates = [];
       for (let k = 1; k < pts.length; k++) {
-        const len = Math.abs(pts[k].x - pts[k - 1].x) + Math.abs(pts[k].y - pts[k - 1].y);
-        if (len > bestLen) { bestLen = len; best = k; }
+        const a = pts[k - 1], b = pts[k];
+        const len = Math.abs(b.x - a.x) + Math.abs(b.y - a.y);
+        if (len < 1) continue;
+        // Midpoint first, then a couple of spots along the same segment
+        [[0.5, 1], [0.34, 0.85], [0.66, 0.85]].forEach(([t, weight]) => {
+          candidates.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t, score: len * weight });
+        });
       }
-      const a = pts[best - 1], b = pts[best];
-      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (!candidates.length) {
+        const mid = pts[Math.floor(pts.length / 2)] || pts[0];
+        return { x: mid.x, y: mid.y };
+      }
+      candidates.sort((p, q) => q.score - p.score);
+
+      let best = null;
+      for (const c of candidates) {
+        const area = overlapAt(c.x, c.y);
+        if (!best || area < best.area) best = { x: c.x, y: c.y, area };
+        if (area === 0) break; // a clear spot — good enough
+      }
+      return { x: best.x, y: best.y };
     }
 
     // Obstacle-aware route between two rects. Returns null when no path exists.
-    function routeEdgeAware(src, tgt, dir, obstacles) {
+    // `avoid` lists extra shapes the *label* should keep off (group frames).
+    function routeEdgeAware(src, tgt, dir, obstacles, dim, avoid) {
       if (!obstacles || !obstacles.length) return null;
       const ports = pickEdgePorts(src, tgt, dir);
       const from = { x: ports.start.x + ports.startOut.x * ROUTE_STUB, y: ports.start.y + ports.startOut.y * ROUTE_STUB };
@@ -10317,7 +10364,7 @@ Process > End`;
       }
       simplified.push(pts[pts.length - 1]);
 
-      const lbl = labelPointForPath(simplified);
+      const lbl = labelPointForPath(simplified, dim, avoid || obstacles);
       return {
         startPoint: simplified[0],
         endPoint: simplified[simplified.length - 1],
@@ -10345,7 +10392,7 @@ Process > End`;
     // Orthogonal routing between two rectangles, using the same port-selection
     // approach as the flat layout's cross-group edges. `dir` is the ELK direction.
     // This is the fallback used when obstacle avoidance cannot find a path.
-    function routeEdge(src, tgt, dir) {
+    function routeEdge(src, tgt, dir, obstacles, dim, avoid) {
       const scX = src.x + src.w / 2, scY = src.y + src.h / 2;
       const tcX = tgt.x + tgt.w / 2, tcY = tgt.y + tgt.h / 2;
       const entryGap = 20;
@@ -10396,12 +10443,13 @@ Process > End`;
         }
       }
 
-      // Label sits on the midpoint of the first segment
-      const first = bendPoints.length ? bendPoints[0] : endPoint;
+      // Label sits where there is room, avoiding node boxes and group frames
+      const pts = [startPoint, ...bendPoints, endPoint];
+      const lbl = labelPointForPath(pts, dim, avoid || obstacles);
       return {
         startPoint, endPoint, bendPoints,
-        labelX: (startPoint.x + first.x) / 2,
-        labelY: (startPoint.y + first.y) / 2
+        labelX: lbl.x,
+        labelY: lbl.y
       };
     }
 
@@ -10426,7 +10474,7 @@ Process > End`;
     // diagrams that do not need avoidance stay exactly as fast (and look) as
     // before. Only a route that would actually cut through a node pays for the
     // obstacle search, and the naive route remains the fallback.
-    function computeEdgeSection(e, src, tgt, dir, obstacles) {
+    function computeEdgeSection(e, src, tgt, dir, obstacles, avoid) {
       if (e.source === e.target) {
         // Self loop: out the right side, back in through the bottom
         return {
@@ -10441,10 +10489,11 @@ Process > End`;
           labelY: src.y + src.h * 0.25
         };
       }
-      const direct = routeEdge(src, tgt, dir);
+      const dim = e.label ? calculateEdgeLabelDimensions(e.label) : null;
+      const direct = routeEdge(src, tgt, dir, obstacles, dim, avoid);
       if (!obstacles || !obstacles.length) return direct;
       if (!pathCrossesObstacles(direct, obstacles, 2)) return direct;
-      return routeEdgeAware(src, tgt, dir, obstacles) || direct;
+      return routeEdgeAware(src, tgt, dir, obstacles, dim, avoid) || direct;
     }
 
     // Route every parsed edge between its final rectangles (nodes or groups).
@@ -10459,6 +10508,8 @@ Process > End`;
         return [g.name, gr ? { id: `__group_${gi}`, name: g.name, x: gr.x, y: gr.y, w: gr.width, h: gr.height } : null];
       }));
       const groupOfNode = groupOfNodeMap(parsed);
+      // Labels also keep clear of group frames, so they never sit on a border
+      const groupFrameRects = groupRects.map(g => ({ id: g.id, x: g.x, y: g.y, w: g.width, h: g.height }));
 
       const routed = [];
       parsed.edges.forEach((e, i) => {
@@ -10468,13 +10519,17 @@ Process > End`;
         const obstacles = buildRoutingObstacles(
           rects, groupOfNode, e.source, e.target,
           e.sourceIsGroup ? e.source : null, e.targetIsGroup ? e.target : null);
-        const section = computeEdgeSection(e, src, tgt, dir, obstacles);
+        // Group frames also steer the route, so a line does not graze a border it
+        // merely passes — but an edge's own frames never block it
+        const frameObstacles = obstacles.concat(
+          groupFrameRects.filter(f => f.id !== src.id && f.id !== tgt.id));
+        const section = computeEdgeSection(e, src, tgt, dir, frameObstacles, obstacles.concat(groupFrameRects));
         const edgeId = `mp_${i}`;
         parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
         routed.push({
           id: edgeId,
           sections: [section],
-          labels: e.label ? [{ ...calculateEdgeLabelDimensions(e.label), x: section.labelX, y: section.labelY }] : []
+          labels: e.label ? [{ ...calculateEdgeLabelDimensions(e.label), x: section.labelX, y: section.labelY, snap: false }] : []
         });
       });
       return routed;
@@ -10667,8 +10722,10 @@ Process > End`;
                 let lx = l.x + ox + bx;
                 let ly = l.y + oy + by;
 
-                // Snap label to the edge path midpoint for better placement
-                if (e.sections && e.sections.length > 0) {
+                // Snap label to the edge path midpoint for better placement.
+                // Manual (drag-routed) labels carry snap:false — their position
+                // was chosen to avoid boxes, so it must be respected.
+                if (l.snap !== false && e.sections && e.sections.length > 0) {
                   const s = e.sections[0];
                   const sp = { x: s.startPoint.x + ox + bx, y: s.startPoint.y + oy + by };
                   const ep = { x: s.endPoint.x + ox + bx, y: s.endPoint.y + oy + by };
@@ -11710,6 +11767,420 @@ Process > End`;
       return { svg, width: laid.width, height: laid.height };
     }
 
+    // ============================================
+    // Entity Relationship Diagrams
+    // ============================================
+
+    const ER_CONFIG = {
+      minWidth: 150,
+      maxWidth: 230,
+      headerHeight: 28,
+      rowHeight: 17,
+      paddingX: 12,
+      paddingY: 8,
+      pad: 40,
+      glyphSize: 9
+    };
+
+    // Common SQL types, so `int orderNumber PK` reads as well as `orderNumber int PK`
+    const ER_SQL_TYPES = new Set(['int', 'integer', 'bigint', 'smallint', 'string', 'text', 'varchar', 'char',
+      'bool', 'boolean', 'float', 'double', 'decimal', 'numeric', 'real', 'date', 'datetime', 'timestamp',
+      'time', 'uuid', 'json', 'jsonb', 'blob', 'enum', 'money', 'binary', 'serial']);
+
+    // Cardinality: how many of the *other* entity may relate to this one
+    function erCardinality(token, isLeft) {
+      switch (token) {
+        case '||': return { max: 1, min: 1 };
+        case '|o':
+        case 'o|': return { max: 1, min: 0 };
+        case '}o':
+        case 'o{': return { max: 'many', min: 0 };
+        case '}|':
+        case '|{': return { max: 'many', min: 1 };
+        default: return null;
+      }
+    }
+
+    function isErSource(source) {
+      return /^\s*(type|diagram)\s+(er|erd|entity-relationship)\b/im.test(source);
+    }
+
+    function parseEr(source) {
+      const entities = new Map();
+      const links = [];
+      let current = null;   // entity the following indented lines belong to
+
+      function defineEntity(text) {
+        const m = text.trim().match(/^([\s\S]*?)\s*(\[[^\]]*\])?\s*$/);
+        if (!m) return null;
+        let name = (m[1] || '').trim();
+        const propsStr = m[2] || '';
+        if (!name) return null;
+        if (name.startsWith('"') && name.endsWith('"')) name = name.slice(1, -1);
+        const props = parseProperties(propsStr);
+        const pos = parsePosFromProps(propsStr);
+        const shapeKey = props.shape ? props.shape.toLowerCase() : 'rectangle';
+        const shapeInfo = shapeMap[shapeKey] || shapeMap.default;
+        const existing = entities.get(name);
+        if (existing) {
+          if (props.label && existing.label === existing.id) existing.label = props.label;
+          if (props.icon && !existing.icon) existing.icon = props.icon;
+          if (props.color && !existing.color) existing.color = resolvePropColor(props.color);
+          if (pos && !existing.pos) existing.pos = pos;
+          return existing;
+        }
+        const entity = {
+          id: name,
+          label: props.label || name,
+          color: resolvePropColor(props.color),
+          icon: props.icon,
+          pos,
+          shape: shapeInfo.shape,
+          shapeRadius: shapeInfo.radius,
+          attributes: []
+        };
+        entities.set(name, entity);
+        return entity;
+      }
+
+      // `name [type] [KEYS] ["comment"]` — the type may also come first
+      function addAttribute(entity, text) {
+        let t = text.trim();
+        let comment = null;
+        const cMatch = t.match(/"([^"]*)"\s*$/);
+        if (cMatch) {
+          comment = cMatch[1];
+          t = t.slice(0, cMatch.index).trim();
+        }
+        const tokens = t.split(/\s+/).filter(Boolean);
+        if (!tokens.length) return;
+        let keys = [];
+        const keyMatch = tokens.join(' ').match(/\b((?:PK|FK|UK)(?:\s*,\s*(?:PK|FK|UK))*)\s*$/i);
+        if (keyMatch) {
+          keys = keyMatch[1].split(',').map(k => k.trim().toUpperCase());
+          tokens.splice(tokens.length - 1, 1, ...[], keyMatch[0].trim().replace(/\s/g, '').split(','));
+          // rebuild the remaining tokens without the key text
+          const keyText = keyMatch[0];
+          t = t.slice(0, t.length - keyText.length).trim();
+        }
+        const parts = t.split(/\s+/).filter(Boolean);
+        let name = parts[0] || '';
+        let type = parts[1] || null;
+        // Mermaid order: `type name`
+        if (parts.length >= 2 && ER_SQL_TYPES.has(String(parts[0]).toLowerCase())) {
+          name = parts[1];
+          type = parts[0];
+        } else if (parts.length > 2) {
+          type = parts.slice(1).join(' ');
+        }
+        if (!name) return;
+        entity.attributes.push({ name: name.replace(/^\*/, ''), type, keys, comment, pk: keys.includes('PK') });
+      }
+
+      for (const raw of source.split('\n')) {
+        const line = raw.replace(/\s+$/, '');
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) continue;
+        if (/^(type|diagram)\s+(er|erd|entity-relationship)\b/i.test(trimmed)) continue;
+        if (/^(direction|colorMode|styleMode|typeface)\s+/i.test(trimmed)) continue;
+
+        const indent = (line.match(/^[\t ]*/) || [''])[0].replace(/\t/g, '  ').length;
+
+        // --- Mermaid relationship: A ||--o{ B : label ---
+        const mermaid = trimmed.match(/^(\S+(?:\s+\S+)*?)\s+(\|o|o\||\|\||\}o|o\{|\}\||\|\{)\s*(--|\.\.)\s*(\|o|o\||\|\||\}o|o\{|\}\||\|\{)\s+(\S+?)(?:\s*:\s*(.*))?$/);
+        if (mermaid) {
+          const a = defineEntity(mermaid[1]);
+          const b = defineEntity(mermaid[5]);
+          const left = erCardinality(mermaid[2], true);
+          const right = erCardinality(mermaid[4], false);
+          if (a && b && left && right) {
+            links.push({
+              source: a.id, target: b.id,
+              label: (mermaid[6] || '').trim(),
+              left, right,
+              identifying: mermaid[3] === '--',
+              connectorType: '-', color: null
+            });
+          }
+          current = null;
+          continue;
+        }
+
+        // --- Simple form: A 1-many B : label ---
+        const simple = trimmed.match(/^(\S+(?:\s+\S+)*?)\s+(1-1|1-many|many-1|many-many|1-1|one-to-one|one-to-many|many-to-one|many-to-many)\s+(\S+?)(?:\s*:\s*(.*))?$/i);
+        if (simple) {
+          const kind = simple[2].toLowerCase();
+          const a = defineEntity(simple[1]);
+          const b = defineEntity(simple[3]);
+          if (a && b) {
+            const many = k => k.includes('many');
+            const leftMax = kind === '1-1' || kind === 'one-to-one' ? 1 : 'many';
+            const rightMax = kind === '1-1' || kind === 'one-to-one' ? 1 : (kind === 'many-1' || kind === 'many-to-one' ? 1 : 'many');
+            links.push({
+              source: a.id, target: b.id,
+              label: (simple[4] || '').trim(),
+              left: { max: leftMax, min: leftMax === 1 ? 1 : 0 },
+              right: { max: rightMax, min: rightMax === 1 ? 1 : 0 },
+              identifying: true,
+              connectorType: '-', color: null
+            });
+          }
+          current = null;
+          continue;
+        }
+
+        // --- Attribute line under the last entity ---
+        if (indent > 0 && current) {
+          addAttribute(current, trimmed);
+          continue;
+        }
+
+        // --- Entity definition ---
+        const entity = defineEntity(trimmed);
+        if (entity) current = entity;
+      }
+
+      return {
+        type: 'er',
+        entities: Array.from(entities.values()),
+        edges: links,
+        groups: [],
+        groupNames: new Set(),
+        direction: 'down'
+      };
+    }
+
+    // Entity boxes are measured from their header and attribute list, then
+    // placed by ELK (the same engine the flowcharts use).
+    function measureErEntities(parsed) {
+      const C = ER_CONFIG;
+      const boxes = new Map();
+      parsed.entities.forEach(e => {
+        const iconInfo = getIconInfo(e.icon);
+        const hasIcon = !!(iconInfo && iconInfo.paths);
+        const headerLines = wrapText(e.label, C.maxWidth - C.paddingX * 2);
+        const headerW = Math.max(...headerLines.map(l => l.length * 7)) + (hasIcon ? 30 : 0);
+        let rowsW = 0;
+        const rows = e.attributes.map(a => {
+          const nameW = a.name.length * 6.2;
+          const typeW = a.type ? a.type.length * 5.6 : 0;
+          const keyW = a.keys.length ? a.keys.join(',').length * 5.6 + 6 : 0;
+          const w = nameW + (typeW ? typeW + 10 : 0) + keyW;
+          rowsW = Math.max(rowsW, w);
+          return a;
+        });
+        const w = Math.max(C.minWidth, Math.min(C.maxWidth, Math.max(headerW, rowsW) + C.paddingX * 2));
+        const h = C.headerHeight + (rows.length ? rows.length * C.rowHeight : 6) + C.paddingY;
+        boxes.set(e.id, { id: e.id, entity: e, w, h, headerLines, rows, hasIcon, iconInfo });
+      });
+      return boxes;
+    }
+
+    async function layoutEr(parsed) {
+      const C = ER_CONFIG;
+      const dirMap = { down: 'DOWN', up: 'UP', left: 'LEFT', right: 'RIGHT' };
+      const elkDirection = dirMap[parsed.direction] || 'DOWN';
+      const boxes = measureErEntities(parsed);
+
+      const elkGraph = {
+        id: 'root',
+        layoutOptions: {
+          'elk.algorithm': 'layered',
+          'elk.direction': elkDirection,
+          'elk.spacing.nodeNode': '54',
+          'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+          'elk.layered.spacing.edgeNodeBetweenLayers': '35',
+          'elk.edgeRouting': 'ORTHOGONAL',
+          'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX'
+        },
+        children: Array.from(boxes.values()).map(b => ({ id: b.id, width: b.w, height: b.h })),
+        edges: parsed.edges.map((e, i) => ({ id: `er_${i}`, sources: [e.source], targets: [e.target] }))
+      };
+      const elkResult = await elk.layout(elkGraph);
+
+      const posMap = new Map((elkResult.children || []).map(c => [c.id, c]));
+      Array.from(boxes.values()).forEach(b => {
+        const c = posMap.get(b.id);
+        b.x = c ? c.x : 0;
+        b.y = c ? c.y : 0;
+      });
+
+      // Manual positions win, and the boxes they displace are re-routed below
+      parsed.entities.forEach(e => {
+        const b = boxes.get(e.id);
+        if (b && e.pos) { b.x = Math.max(0, e.pos.x); b.y = Math.max(0, e.pos.y); }
+      });
+
+      const anyPin = parsed.entities.some(e => e.pos);
+      const rects = Array.from(boxes.values()).map(b => ({ id: b.id, x: b.x, y: b.y, w: b.w, h: b.h }));
+
+      // Routes: ELK's when nothing is pinned, our own (obstacle-aware) otherwise
+      let routes = new Map();
+      parsed.edges.forEach((e, i) => {
+        const ec = (elkResult.edges || []).find(x => x.id === `er_${i}`);
+        if (ec && ec.sections && ec.sections[0]) {
+          const s = ec.sections[0];
+          const pts = [{ x: s.startPoint.x, y: s.startPoint.y },
+            ...(s.bendPoints || []).map(b => ({ x: b.x, y: b.y })),
+            { x: s.endPoint.x, y: s.endPoint.y }];
+          routes.set(i, pts);
+        }
+      });
+      if (anyPin) {
+        const byId = new Map(rects.map(r => [r.id, r]));
+        const groupOf = new Map();
+        parsed.edges.forEach((e, i) => {
+          const src = byId.get(e.source);
+          const tgt = byId.get(e.target);
+          if (!src || !tgt) return;
+          const obstacles = rects.filter(r => r.id !== e.source && r.id !== e.target);
+          const sec = computeEdgeSection({ source: e.source, target: e.target }, src, tgt, elkDirection, obstacles);
+          routes.set(i, [{ x: sec.startPoint.x, y: sec.startPoint.y }, ...(sec.bendPoints || []), { x: sec.endPoint.x, y: sec.endPoint.y }]);
+        });
+      }
+
+      let xMin = Infinity, xMax = -Infinity, yMin = Infinity, yMax = -Infinity;
+      rects.forEach(r => {
+        xMin = Math.min(xMin, r.x);
+        xMax = Math.max(xMax, r.x + r.w);
+        yMin = Math.min(yMin, r.y);
+        yMax = Math.max(yMax, r.y + r.h);
+      });
+      if (!isFinite(xMin)) { xMin = 0; xMax = 200; yMin = 0; yMax = 100; }
+
+      return {
+        boxes, rects, routes, anyPin,
+        ox: C.pad - xMin, oy: C.pad - yMin,
+        width: (xMax - xMin) + C.pad * 2,
+        height: (yMax - yMin) + C.pad * 2
+      };
+    }
+
+    // Crow's-foot end marker drawn in local space, +x pointing into the entity
+    function erGlyphSvg(card) {
+      const s = ER_CONFIG.glyphSize;
+      if (card.max === 1) {
+        // one end: a single bar (plus a circle when the minimum is zero)
+        let out = `<line x1="0" y1="${-s}" x2="0" y2="${s}" stroke="currentColor" stroke-width="1.6"/>`;
+        if (card.min === 0) out += `<circle cx="${-(s + 5)}" cy="0" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
+        return out;
+      }
+      // many end: crow's foot (plus a bar or circle for the minimum)
+      let out = `<path d="M 0 0 L ${-s} ${-s} M 0 0 L ${-s} 0 M 0 0 L ${-s} ${s}" fill="none" stroke="currentColor" stroke-width="1.6"/>`;
+      if (card.min === 1) out += `<line x1="${-(s + 5)}" y1="${-s}" x2="${-(s + 5)}" y2="${s}" stroke="currentColor" stroke-width="1.6"/>`;
+      else out += `<circle cx="${-(s + 9)}" cy="0" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/>`;
+      return out;
+    }
+
+    // Geometry of one relationship line, shared by the renderer and live drags
+    function erLinkGeometry(pts, link, obstacles) {
+      if (!pts || pts.length < 2) return null;
+      const a = pts[0], b = pts[pts.length - 1];
+      const prevOfA = pts[1] || b;
+      const nextOfB = pts[pts.length - 2] || a;
+      const angA = Math.atan2(a.y - prevOfA.y, a.x - prevOfA.x) * 180 / Math.PI;
+      const angB = Math.atan2(b.y - nextOfB.y, b.x - nextOfB.x) * 180 / Math.PI;
+      const lbl = labelPointForPath(pts, link && link.label ? calculateEdgeLabelDimensions(link.label) : null, obstacles);
+      return {
+        d: sectionToPathD({ startPoint: a, endPoint: b, bendPoints: pts.slice(1, -1) }),
+        a: { x: a.x, y: a.y, rot: angA },
+        b: { x: b.x, y: b.y, rot: angB },
+        labelX: lbl.x,
+        labelY: lbl.y
+      };
+    }
+
+    function renderEr(laid, parsed) {
+      const style = getComputedStyle(document.body);
+      const nodeFill = style.getPropertyValue('--node-fill').trim();
+      const nodeStroke = style.getPropertyValue('--node-stroke').trim();
+      const nodeText = style.getPropertyValue('--node-text').trim();
+      const edgeStroke = style.getPropertyValue('--edge-stroke').trim();
+      const textDim = style.getPropertyValue('--text-dim').trim();
+      const accent = style.getPropertyValue('--accent').trim() || edgeStroke;
+
+      const C = ER_CONFIG;
+      const { ox, oy } = laid;
+
+      let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${laid.width} ${laid.height}">`;
+
+      // Relationships first so entity boxes sit on top
+      parsed.edges.forEach((e, i) => {
+        const geo = erLinkGeometry(laid.routes.get(i), e, laid.rects);
+        if (!geo) return;
+        const dash = e.identifying ? '' : ' stroke-dasharray="5 3"';
+        svg += `<g color="${edgeStroke}">`;
+        svg += `<path data-edge-id="er_${i}" d="${geo.d}" fill="none" stroke="${edgeStroke}" stroke-width="1.4"${dash}/>`;
+        svg += `<g data-er-glyph-a="${i}" transform="translate(${geo.a.x},${geo.a.y}) rotate(${geo.a.rot})">${erGlyphSvg(e.left)}</g>`;
+        svg += `<g data-er-glyph-b="${i}" transform="translate(${geo.b.x},${geo.b.y}) rotate(${geo.b.rot})">${erGlyphSvg(e.right)}</g>`;
+        svg += `</g>`;
+        if (e.label) {
+          const lines = wrapText(e.label, 100);
+          const boxW = Math.max(...lines.map(l => l.length * 6)) + 6;
+          const boxH = lines.length * 12 + 4;
+          const textStartY = -(lines.length - 1) * 6;
+          svg += `<g data-edge-label-id="er_${i}" transform="translate(${geo.labelX},${geo.labelY})">`;
+          svg += `<rect x="${-boxW / 2}" y="${-boxH / 2}" width="${boxW}" height="${boxH}" rx="2" fill="${nodeFill}" stroke="none"/>`;
+          lines.forEach((line, li) => {
+            svg += `<text x="0" y="${textStartY + li * 12}" text-anchor="middle" dominant-baseline="middle" fill="${textDim}" font-size="10" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+          });
+          svg += `</g>`;
+        }
+      });
+
+      // Entity boxes
+      laid.boxes.forEach(b => {
+        const e = b.entity;
+        const x = b.x + ox, y = b.y + oy;
+        const fill = e.color || nodeFill;
+        const textColor = e.color ? (isDarkColor(e.color) ? '#ffffff' : '#1a1a1a') : nodeText;
+        svg += `<g class="fs-node" data-node-id="${esc(e.id)}">`;
+        svg += `<rect x="${x}" y="${y}" width="${b.w}" height="${b.h}" rx="6" fill="${fill}" stroke="${nodeStroke}" stroke-width="1.5"/>`;
+        // header band
+        svg += `<path d="M ${x} ${y + 6} a 6 6 0 0 1 6 -6 h ${b.w - 12} a 6 6 0 0 1 6 6 v ${C.headerHeight - 6} h ${-b.w} z" fill="${nodeStroke}" opacity="0.18"/>`;
+        svg += `<line x1="${x}" y1="${y + C.headerHeight}" x2="${x + b.w}" y2="${y + C.headerHeight}" stroke="${nodeStroke}" stroke-width="1"/>`;
+        const textX = b.hasIcon ? x + 32 : x + b.w / 2;
+        const anchor = b.hasIcon ? 'start' : 'middle';
+        if (b.hasIcon && b.iconInfo) {
+          const attrs = b.iconInfo.filled
+            ? `fill="${textColor}" stroke="none"`
+            : `fill="none" stroke="${textColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"`;
+          svg += `<g transform="translate(${x + 10},${y + 7})"><svg width="16" height="16" viewBox="0 0 24 24" ${attrs}>`;
+          b.iconInfo.paths.forEach(d => { svg += `<path d="${d}"/>`; });
+          svg += `</svg></g>`;
+        }
+        b.headerLines.forEach((line, i) => {
+          svg += `<text x="${textX}" y="${y + 12 + i * 13 + 5}" text-anchor="${anchor}" fill="${textColor}" font-size="12" font-weight="600" font-family="DM Sans,sans-serif">${esc(line)}</text>`;
+        });
+        b.rows.forEach((a, i) => {
+          const ry = y + C.headerHeight + C.paddingY + i * C.rowHeight + 8;
+          const nameFill = a.pk ? textColor : textColor;
+          const deco = a.pk ? ' text-decoration="underline"' : '';
+          svg += `<text x="${x + C.paddingX}" y="${ry}" fill="${nameFill}" font-size="11" font-family="DM Sans,sans-serif"${deco}>${esc(a.name)}</text>`;
+          if (a.type) {
+            svg += `<text x="${x + b.w - C.paddingX}" y="${ry}" text-anchor="end" fill="${textDim}" font-size="10" font-family="DM Sans,sans-serif" font-style="italic">${esc(a.type)}</text>`;
+          }
+          if (a.keys.length) {
+            const keyText = a.keys.join(',');
+            const keyX = x + C.paddingX + a.name.length * 6.2 + 6;
+            svg += `<text x="${keyX}" y="${ry}" fill="${accent}" font-size="9" font-weight="700" font-family="DM Sans,sans-serif">${esc(keyText)}</text>`;
+          }
+        });
+        svg += `</g>`;
+      });
+
+      svg += `</svg>`;
+
+      state.lastRender = {
+        ox, oy, anyPin: laid.anyPin,
+        nodes: new Map(Array.from(laid.boxes.values()).map(b => [b.id, { x: b.x + ox, y: b.y + oy, w: b.w, h: b.h }])),
+        groups: [],
+        er: laid
+      };
+
+      return { svg, width: laid.width, height: laid.height };
+    }
+
     async function updateDiagram() {
       const source = editor.value;
 
@@ -11749,6 +12220,20 @@ Process > End`;
           canvas.innerHTML = svg;
           canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
           setStatus(`${parsed.nodes.length} people`, false);
+          return;
+        }
+
+        if (parsed.type === 'er') {
+          if (parsed.entities.length === 0) {
+            canvas.innerHTML = '';
+            setStatus('Ready', false);
+            return;
+          }
+          const laid = await layoutEr(parsed);
+          const { svg, width, height } = renderEr(laid, parsed);
+          canvas.innerHTML = svg;
+          canvas.setAttribute('viewBox', `0 0 ${width} ${height}`);
+          setStatus(`${parsed.entities.length} entities, ${parsed.edges.length} relations`, false);
           return;
         }
 
@@ -12108,6 +12593,18 @@ Process > End`;
         return;
       }
 
+      // ER relations re-route themselves in the per-frame updater, so a drag
+      // start only needs to cache the line, its crow's-foot markers and label
+      if (parsed.type === 'er') {
+        drag.erEls = parsed.edges.map((e, i) => ({
+          path: canvas.querySelector(`path[data-edge-id="er_${i}"]`),
+          glyphA: canvas.querySelector(`g[data-er-glyph-a="${i}"]`),
+          glyphB: canvas.querySelector(`g[data-er-glyph-b="${i}"]`),
+          label: canvas.querySelector(`g[data-edge-label-id="er_${i}"]`)
+        }));
+        return;
+      }
+
       // Flowcharts are the only type that needs the cached ELK result, and
       // only to switch the view from ELK routing to manual routing
       if (!state.lastElkResult) return;
@@ -12185,6 +12682,12 @@ Process > End`;
         return;
       }
 
+      // ER: re-route the relations attached to the dragged entity
+      if (state.lastParsed && state.lastParsed.type === 'er') {
+        runErFrame(d);
+        return;
+      }
+
       const parsed = state.lastParsed;
       const lr = state.lastRender;
       if (!parsed || !lr || !d.edgeEls) return;
@@ -12229,7 +12732,10 @@ Process > End`;
         const obstacles = buildRoutingObstacles(
           liveRects, groupOfNode, e.source, e.target,
           e.sourceIsGroup ? e.source : null, e.targetIsGroup ? e.target : null);
-        const sec = computeEdgeSection(e, src, tgt, dir, obstacles);
+        const frames = Array.from(lr.groups).map(g => ({ id: g.name, x: g.x, y: g.y, w: g.w, h: g.h }));
+        // A dragged group moves its frame, so exclude the endpoints' own frames
+        const frameObstacles = obstacles.concat(frames.filter(f => f.id !== src.id && f.id !== tgt.id));
+        const sec = computeEdgeSection(e, src, tgt, dir, frameObstacles, obstacles.concat(frames));
         els.path.setAttribute('d', sectionToPathD(sec));
         if (els.label) els.label.setAttribute('transform', `translate(${sec.labelX},${sec.labelY})`);
       });
@@ -12263,6 +12769,45 @@ Process > End`;
       drag.raf = 0;
       drag.elements.forEach(el => el.classList.add('fs-drag-active'));
       runDragFrame(drag);
+    }
+
+    // Live update for ER diagrams: relations attached to the dragged entity are
+    // re-routed around the boxes, and their crow's feet and labels follow.
+    function runErFrame(d) {
+      const lr = state.lastRender;
+      const parsed = state.lastParsed;
+      if (!d.erEls || !d.lastDelta || !lr || !parsed) return;
+      const { dx, dy } = d.lastDelta;
+      const dirMap = { down: 'DOWN', up: 'UP', left: 'LEFT', right: 'RIGHT' };
+      const dir = dirMap[parsed.direction] || 'DOWN';
+      const groupOfNode = groupOfNodeMap(parsed);
+
+      const liveRects = [];
+      const liveById = new Map();
+      lr.nodes.forEach((r, id) => {
+        const moved = (d.kind === 'node' && id === d.id) || (d.kind === 'group' && d.memberIds && d.memberIds.has(id));
+        const rect = { id, x: r.x + (moved ? dx : 0), y: r.y + (moved ? dy : 0), w: r.w, h: r.h };
+        liveRects.push(rect);
+        liveById.set(id, rect);
+      });
+
+      parsed.edges.forEach((e, i) => {
+        const els = d.erEls[i];
+        if (!els || !els.path) return;
+        if (d.kind === 'node' && e.source !== d.id && e.target !== d.id) return;
+        const src = liveById.get(e.source);
+        const tgt = liveById.get(e.target);
+        if (!src || !tgt) return;
+        const obstacles = buildRoutingObstacles(liveRects, groupOfNode, e.source, e.target, null, null);
+        const sec = computeEdgeSection({ source: e.source, target: e.target }, src, tgt, dir, obstacles);
+        const pts = [sec.startPoint, ...(sec.bendPoints || []), sec.endPoint];
+        const geo = erLinkGeometry(pts, e, obstacles);
+        if (!geo) return;
+        els.path.setAttribute('d', geo.d);
+        if (els.glyphA) els.glyphA.setAttribute('transform', `translate(${geo.a.x},${geo.a.y}) rotate(${geo.a.rot})`);
+        if (els.glyphB) els.glyphB.setAttribute('transform', `translate(${geo.b.x},${geo.b.y}) rotate(${geo.b.rot})`);
+        if (els.label) els.label.setAttribute('transform', `translate(${geo.labelX},${geo.labelY})`);
+      });
     }
 
     // Live update for org charts: the dragged card and its whole subtree move
@@ -12427,7 +12972,11 @@ Process > End`;
       const y = Math.round((d.base.y + d.lastDelta.dy - lr.oy) / SNAP) * SNAP;
       if (d.kind === 'node') {
         // Keep the cached parse in sync until the scheduled re-render replaces it
-        const n = state.lastParsed && state.lastParsed.nodes.find(n => n.id === d.id);
+        // (flowcharts and org charts use `nodes`, ER uses `entities`, sequence uses `actors`)
+        const list = state.lastParsed
+          ? (state.lastParsed.nodes || state.lastParsed.entities || state.lastParsed.actors || [])
+          : [];
+        const n = list.find(item => item.id === d.id);
         if (n) n.pos = { x, y };
         setNodePosInText(d.id, x, y);
       } else {
@@ -13042,6 +13591,32 @@ Cloud [color: orange] {
 Frontend > Backend: REST API
 Backend > Cloud: async jobs
 Cloud > Frontend: static assets`,
+
+      'order-model.flow': `// Entity Relationship Diagram
+// Mermaid-style cardinalities (||--o{, ||--|{, o| …) or the short form
+// (A 1-many B). Indented lines are attributes.
+
+type er
+
+CUSTOMER [icon: user]
+  id int PK
+  name string
+  email string UK
+
+ORDER
+  id int PK
+  customer_id int FK
+  total decimal
+  placed_at timestamp
+
+LINE_ITEM
+  order_id int PK, FK
+  sku string PK
+  qty int
+
+CUSTOMER ||--o{ ORDER : places
+ORDER ||--|{ LINE_ITEM : contains
+CUSTOMER ||--o| LINE_ITEM : references`,
 
       'org-chart.flow': `// Org Chart (indentation = reporting line)
 // Person cards with a role, plus the usual color/icon/label properties
