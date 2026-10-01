@@ -10067,8 +10067,270 @@ Process > End`;
     // Manual Edge Routing (used when pos overrides exist)
     // ============================================
 
+    // ---- Obstacle-aware orthogonal routing ----
+    // A sparse (Hanan) grid is built from the obstacle edges, then A* finds the
+    // cheapest orthogonal path with a turn penalty, so an edge bends around
+    // intervening nodes instead of cutting straight through them. The naive
+    // router below stays as the fallback when no path exists.
+
+    const ROUTE_MARGIN = 16;          // clearance kept around obstacles
+    const ROUTE_TURN = 26;            // cost of a 90-degree turn
+    const ROUTE_STUB = 16;            // straight run outside each node port
+    const ROUTE_MAX_OBSTACLES = 70;   // above this, stay on the fast naive route
+    const ROUTE_MAX_CELLS = 30000;
+
+    // Does an axis-aligned segment cross the margin-expanded rect?
+    function segmentHitsRect(x1, y1, x2, y2, r) {
+      const minX = r.x - ROUTE_MARGIN, minY = r.y - ROUTE_MARGIN;
+      const maxX = r.x + r.w + ROUTE_MARGIN, maxY = r.y + r.h + ROUTE_MARGIN;
+      if (Math.abs(y1 - y2) < 0.001) {
+        const lo = Math.min(x1, x2), hi = Math.max(x1, x2);
+        return y1 > minY && y1 < maxY && hi > minX && lo < maxX;
+      }
+      const lo = Math.min(y1, y2), hi = Math.max(y1, y2);
+      return x1 > minX && x1 < maxX && hi > minY && lo < maxY;
+    }
+
+    // A* over the sparse grid. Returns a list of points, or null if unreachable.
+    function routeOrthogonalAvoiding(from, to, obstacles) {
+      if (!obstacles.length || obstacles.length > ROUTE_MAX_OBSTACLES) return null;
+
+      const xsSet = new Set([from.x, to.x]);
+      const ysSet = new Set([from.y, to.y]);
+      for (const o of obstacles) {
+        xsSet.add(o.x - ROUTE_MARGIN); xsSet.add(o.x + o.w + ROUTE_MARGIN);
+        ysSet.add(o.y - ROUTE_MARGIN); ysSet.add(o.y + o.h + ROUTE_MARGIN);
+      }
+      const X = [...xsSet].sort((a, b) => a - b);
+      const Y = [...ysSet].sort((a, b) => a - b);
+      const W = X.length, H = Y.length;
+      if (W < 2 || H < 2 || W * H > ROUTE_MAX_CELLS) return null;
+
+      const xi = new Map(X.map((v, i) => [v, i]));
+      const yi = new Map(Y.map((v, i) => [v, i]));
+      const si = xi.get(from.x), sj = yi.get(from.y);
+      const ti = xi.get(to.x), tj = yi.get(to.y);
+      if (si === undefined || sj === undefined || ti === undefined || tj === undefined) return null;
+
+      // Blocked moves and cells that fall inside an obstacle
+      const blockH = new Uint8Array(W * H); // (i,j) -> (i+1,j)
+      const blockV = new Uint8Array(W * H); // (i,j) -> (i,j+1)
+      const solid = new Uint8Array(W * H);
+      for (let j = 0; j < H; j++) {
+        for (let i = 0; i < W; i++) {
+          const cell = j * W + i;
+          for (const o of obstacles) {
+            if (X[i] > o.x - ROUTE_MARGIN && X[i] < o.x + o.w + ROUTE_MARGIN &&
+                Y[j] > o.y - ROUTE_MARGIN && Y[j] < o.y + o.h + ROUTE_MARGIN) { solid[cell] = 1; break; }
+          }
+          if (i + 1 < W) {
+            for (const o of obstacles) {
+              if (segmentHitsRect(X[i], Y[j], X[i + 1], Y[j], o)) { blockH[cell] = 1; break; }
+            }
+          }
+          if (j + 1 < H) {
+            for (const o of obstacles) {
+              if (segmentHitsRect(X[i], Y[j], X[i], Y[j + 1], o)) { blockV[cell] = 1; break; }
+            }
+          }
+        }
+      }
+      if (solid[sj * W + si] || solid[tj * W + ti]) return null;
+
+      // States are (cell, heading) so a change of direction can be penalised
+      const total = W * H * 2;
+      const gScore = new Float64Array(total).fill(Infinity);
+      const cameFrom = new Int32Array(total).fill(-1);
+      const heap = []; // binary heap of [f, state]
+      const hCost = (i, j) => Math.abs(X[i] - to.x) + Math.abs(Y[j] - to.y);
+      const push = (f, s) => {
+        heap.push([f, s]);
+        let k = heap.length - 1;
+        while (k > 0) {
+          const p = (k - 1) >> 1;
+          if (heap[p][0] <= heap[k][0]) break;
+          const t = heap[p]; heap[p] = heap[k]; heap[k] = t;
+          k = p;
+        }
+      };
+      const pop = () => {
+        const top = heap[0];
+        const last = heap.pop();
+        if (heap.length) {
+          heap[0] = last;
+          let k = 0;
+          for (;;) {
+            const l = 2 * k + 1, r = l + 1;
+            let m = k;
+            if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
+            if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
+            if (m === k) break;
+            const t = heap[m]; heap[m] = heap[k]; heap[k] = t;
+            k = m;
+          }
+        }
+        return top;
+      };
+      const relax = (i, j, dir, cost, prev) => {
+        const state = (j * W + i) * 2 + dir;
+        if (cost < gScore[state]) {
+          gScore[state] = cost;
+          cameFrom[state] = prev;
+          push(cost + hCost(i, j), state);
+        }
+      };
+
+      relax(si, sj, 0, 0, -1);
+      relax(si, sj, 1, 0, -1);
+
+      let goal = -1;
+      while (heap.length) {
+        const [, state] = pop();
+        const dir = state % 2;
+        const cell = (state - dir) / 2;
+        const i = cell % W, j = (cell - i) / W;
+        if (i === ti && j === tj) { goal = state; break; }
+        const g = gScore[state];
+        if (i + 1 < W && !blockH[cell]) relax(i + 1, j, 0, g + (X[i + 1] - X[i]) + (dir === 1 ? ROUTE_TURN : 0), state);
+        if (i > 0 && !blockH[cell - 1]) relax(i - 1, j, 0, g + (X[i] - X[i - 1]) + (dir === 1 ? ROUTE_TURN : 0), state);
+        if (j + 1 < H && !blockV[cell]) relax(i, j + 1, 1, g + (Y[j + 1] - Y[j]) + (dir === 0 ? ROUTE_TURN : 0), state);
+        if (j > 0 && !blockV[cell - W]) relax(i, j - 1, 1, g + (Y[j] - Y[j - 1]) + (dir === 0 ? ROUTE_TURN : 0), state);
+      }
+      if (goal < 0) return null;
+
+      // Reconstruct, then drop duplicate and collinear points
+      const raw = [];
+      for (let s = goal; s !== -1; s = cameFrom[s]) {
+        const d = s % 2;
+        const cell = (s - d) / 2;
+        const i = cell % W, j = (cell - i) / W;
+        raw.push({ x: X[i], y: Y[j] });
+      }
+      raw.reverse();
+      const pts = [raw[0]];
+      for (let k = 1; k < raw.length - 1; k++) {
+        const p = pts[pts.length - 1], c = raw[k], n = raw[k + 1];
+        const collinear = (Math.abs(p.x - c.x) < 0.001 && Math.abs(c.x - n.x) < 0.001) ||
+                          (Math.abs(p.y - c.y) < 0.001 && Math.abs(c.y - n.y) < 0.001);
+        if (!collinear) pts.push(c);
+      }
+      pts.push(raw[raw.length - 1]);
+      return pts;
+    }
+
+    // Exit/entry border points for a flow, with the outward direction of each
+    // so a short stub can be placed clear of the node.
+    function pickEdgePorts(src, tgt, dir) {
+      const scX = src.x + src.w / 2, scY = src.y + src.h / 2;
+      const tcX = tgt.x + tgt.w / 2, tcY = tgt.y + tgt.h / 2;
+      const horizontal = dir === 'RIGHT' || dir === 'LEFT';
+      const up = dir === 'UP';
+      const targetIsRight = tcX > scX + src.w / 2;
+      const targetIsLeft = tcX < scX - src.w / 2;
+
+      if (horizontal && (targetIsRight || targetIsLeft)) {
+        return {
+          start: { x: targetIsRight ? src.x + src.w : src.x, y: scY },
+          startOut: { x: targetIsRight ? 1 : -1, y: 0 },
+          end: { x: targetIsRight ? tgt.x : tgt.x + tgt.w, y: tcY },
+          endOut: { x: targetIsRight ? -1 : 1, y: 0 }
+        };
+      }
+      if (!horizontal && (targetIsRight || targetIsLeft)) {
+        return {
+          start: { x: targetIsRight ? src.x + src.w : src.x, y: scY },
+          startOut: { x: targetIsRight ? 1 : -1, y: 0 },
+          end: { x: tcX, y: up ? tgt.y + tgt.h : tgt.y },
+          endOut: { x: 0, y: up ? 1 : -1 }
+        };
+      }
+      // Primary axis flow: leave and enter through the facing sides
+      const vertical = !horizontal;
+      const startOut = vertical ? { x: 0, y: up ? -1 : 1 } : { x: dir === 'RIGHT' ? 1 : -1, y: 0 };
+      const endOut = vertical ? { x: 0, y: up ? 1 : -1 } : { x: dir === 'RIGHT' ? -1 : 1, y: 0 };
+      if (vertical) {
+        return {
+          start: { x: scX, y: up ? src.y : src.y + src.h },
+          startOut,
+          end: { x: tcX, y: up ? tgt.y + tgt.h : tgt.y },
+          endOut
+        };
+      }
+      const rightward = dir === 'RIGHT';
+      return {
+        start: { x: rightward ? src.x + src.w : src.x, y: scY },
+        startOut,
+        end: { x: rightward ? tgt.x : tgt.x + tgt.w, y: tcY },
+        endOut
+      };
+    }
+
+    // Put a label on the longest segment of a path, where there is room for it
+    function labelPointForPath(pts) {
+      let best = 1, bestLen = -1;
+      for (let k = 1; k < pts.length; k++) {
+        const len = Math.abs(pts[k].x - pts[k - 1].x) + Math.abs(pts[k].y - pts[k - 1].y);
+        if (len > bestLen) { bestLen = len; best = k; }
+      }
+      const a = pts[best - 1], b = pts[best];
+      return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
+
+    // Obstacle-aware route between two rects. Returns null when no path exists.
+    function routeEdgeAware(src, tgt, dir, obstacles) {
+      if (!obstacles || !obstacles.length) return null;
+      const ports = pickEdgePorts(src, tgt, dir);
+      const from = { x: ports.start.x + ports.startOut.x * ROUTE_STUB, y: ports.start.y + ports.startOut.y * ROUTE_STUB };
+      const to = { x: ports.end.x + ports.endOut.x * ROUTE_STUB, y: ports.end.y + ports.endOut.y * ROUTE_STUB };
+
+      const mid = routeOrthogonalAvoiding(from, to, obstacles);
+      if (!mid) return null;
+
+      // Anchor the routed path to the node borders, then simplify
+      const points = [ports.start, ...mid, ports.end];
+      const pts = [points[0]];
+      for (let k = 1; k < points.length; k++) {
+        const last = pts[pts.length - 1], p = points[k];
+        if (Math.abs(last.x - p.x) < 0.001 && Math.abs(last.y - p.y) < 0.001) continue;
+        pts.push(p);
+      }
+      const simplified = [pts[0]];
+      for (let k = 1; k < pts.length - 1; k++) {
+        const p = simplified[simplified.length - 1], c = pts[k], n = pts[k + 1];
+        const collinear = (Math.abs(p.x - c.x) < 0.001 && Math.abs(c.x - n.x) < 0.001) ||
+                          (Math.abs(p.y - c.y) < 0.001 && Math.abs(c.y - n.y) < 0.001);
+        if (!collinear) simplified.push(c);
+      }
+      simplified.push(pts[pts.length - 1]);
+
+      const lbl = labelPointForPath(simplified);
+      return {
+        startPoint: simplified[0],
+        endPoint: simplified[simplified.length - 1],
+        bendPoints: simplified.slice(1, -1),
+        labelX: lbl.x,
+        labelY: lbl.y
+      };
+    }
+
+    // Node id -> owning group name (used to exempt a group's own members)
+    function groupOfNodeMap(parsed) {
+      const m = new Map();
+      parsed.groups.forEach(g => g.children.forEach(id => m.set(id, g.name)));
+      return m;
+    }
+
+    // Every node blocks a route except the endpoints themselves and the
+    // members of either endpoint's own group (those live inside the frame).
+    function buildRoutingObstacles(rects, groupOfNode, srcId, tgtId, srcName, tgtName) {
+      return rects.filter(r =>
+        r.id !== srcId && r.id !== tgtId &&
+        groupOfNode.get(r.id) !== srcName && groupOfNode.get(r.id) !== tgtName);
+    }
+
     // Orthogonal routing between two rectangles, using the same port-selection
     // approach as the flat layout's cross-group edges. `dir` is the ELK direction.
+    // This is the fallback used when obstacle avoidance cannot find a path.
     function routeEdge(src, tgt, dir) {
       const scX = src.x + src.w / 2, scY = src.y + src.h / 2;
       const tcX = tgt.x + tgt.w / 2, tcY = tgt.y + tgt.h / 2;
@@ -10129,9 +10391,28 @@ Process > End`;
       };
     }
 
+    // Does a routed section pass through (or graze) any obstacle?
+    function pathCrossesObstacles(section, obstacles, slack) {
+      const pts = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
+      for (let k = 1; k < pts.length; k++) {
+        const a = pts[k - 1], b = pts[k];
+        for (const o of obstacles) {
+          if (segmentHitsRect(a.x, a.y, b.x, b.y, { x: o.x, y: o.y, w: o.w, h: o.h }) ||
+              (a.x > o.x - slack && a.x < o.x + o.w + slack &&
+               a.y > o.y - slack && a.y < o.y + o.h + slack)) return true;
+        }
+      }
+      return false;
+    }
+
     // Route a single edge between two rectangles (self-loops included).
     // Pure geometry — shared by the renderer and the live drag updater.
-    function computeEdgeSection(e, src, tgt, dir) {
+    //
+    // The direct route is tried first and kept whenever it is already clear, so
+    // diagrams that do not need avoidance stay exactly as fast (and look) as
+    // before. Only a route that would actually cut through a node pays for the
+    // obstacle search, and the naive route remains the fallback.
+    function computeEdgeSection(e, src, tgt, dir, obstacles) {
       if (e.source === e.target) {
         // Self loop: out the right side, back in through the bottom
         return {
@@ -10146,7 +10427,10 @@ Process > End`;
           labelY: src.y + src.h * 0.25
         };
       }
-      return routeEdge(src, tgt, dir);
+      const direct = routeEdge(src, tgt, dir);
+      if (!obstacles || !obstacles.length) return direct;
+      if (!pathCrossesObstacles(direct, obstacles, 2)) return direct;
+      return routeEdgeAware(src, tgt, dir, obstacles) || direct;
     }
 
     // Route every parsed edge between its final rectangles (nodes or groups).
@@ -10154,18 +10438,23 @@ Process > End`;
     function routeEdges(parsed, positioned, groupRects) {
       const dirMap = { down: 'DOWN', up: 'UP', left: 'LEFT', right: 'RIGHT' };
       const dir = dirMap[parsed.direction] || 'DOWN';
-      const posMap = new Map(positioned.map(p => [p.id, { x: p.x, y: p.y, w: p.width, h: p.height }]));
+      const rects = positioned.map(p => ({ id: p.id, x: p.x, y: p.y, w: p.width, h: p.height }));
+      const posMap = new Map(rects.map(r => [r.id, r]));
       const groupRectByName = new Map(parsed.groups.map((g, gi) => {
         const gr = groupRects.find(r => r.id === `__group_${gi}`);
-        return [g.name, gr ? { x: gr.x, y: gr.y, w: gr.width, h: gr.height } : null];
+        return [g.name, gr ? { id: `__group_${gi}`, name: g.name, x: gr.x, y: gr.y, w: gr.width, h: gr.height } : null];
       }));
+      const groupOfNode = groupOfNodeMap(parsed);
 
       const routed = [];
       parsed.edges.forEach((e, i) => {
         const src = e.sourceIsGroup ? groupRectByName.get(e.source) : posMap.get(e.source);
         const tgt = e.targetIsGroup ? groupRectByName.get(e.target) : posMap.get(e.target);
         if (!src || !tgt) return;
-        const section = computeEdgeSection(e, src, tgt, dir);
+        const obstacles = buildRoutingObstacles(
+          rects, groupOfNode, e.source, e.target,
+          e.sourceIsGroup ? e.source : null, e.targetIsGroup ? e.target : null);
+        const section = computeEdgeSection(e, src, tgt, dir, obstacles);
         const edgeId = `mp_${i}`;
         parsed._edgeMeta.set(edgeId, { connectorType: e.connectorType, color: e.color });
         routed.push({
@@ -11461,32 +11750,45 @@ Process > End`;
 
       const dirMap = { down: 'DOWN', up: 'UP', left: 'LEFT', right: 'RIGHT' };
       const dir = dirMap[parsed.direction] || 'DOWN';
+      const groupOfNode = groupOfNodeMap(parsed);
 
-      const nodeRect = id => {
-        const r = lr.nodes.get(id);
-        if (!r) return null;
-        return ((d.kind === 'node' && id === d.id) || (d.kind === 'group' && d.memberIds && d.memberIds.has(id)))
-          ? { x: r.x + dx, y: r.y + dy, w: r.w, h: r.h }
-          : r;
-      };
-      const groupIdxByName = new Map(parsed.groups.map((g, i) => [g.name, i]));
-      const groupRect = name => {
-        const gi = groupIdxByName.get(name);
-        if (gi === undefined) return null;
-        const g = lr.groups.find(x => x.idx === gi);
-        if (!g) return null;
-        return (d.kind === 'group' && d.idx === gi)
-          ? { x: g.x + dx, y: g.y + dy, w: g.w, h: g.h }
-          : g;
+      // Live rectangles (render coordinates) with stable ids
+      const liveRects = [];
+      const liveById = new Map();
+      lr.nodes.forEach((r, id) => {
+        const moved = (d.kind === 'node' && id === d.id) ||
+                      (d.kind === 'group' && d.memberIds && d.memberIds.has(id));
+        const rect = { id, x: r.x + (moved ? dx : 0), y: r.y + (moved ? dy : 0), w: r.w, h: r.h };
+        liveRects.push(rect);
+        liveById.set(id, rect);
+      });
+      const liveGroups = new Map();
+      lr.groups.forEach(g => {
+        const moved = d.kind === 'group' && g.idx === d.idx;
+        liveGroups.set(g.name, { id: g.name, x: g.x + (moved ? dx : 0), y: g.y + (moved ? dy : 0), w: g.w, h: g.h });
+      });
+      const draggedGroupName = d.kind === 'group' ? (lr.groups.find(g => g.idx === d.idx) || {}).name : null;
+
+      // Only edges attached to the dragged element can have changed
+      const isAffected = e => {
+        if (d.kind === 'node') return e.source === d.id || e.target === d.id;
+        const member = id => d.memberIds && d.memberIds.has(id);
+        return member(e.source) || member(e.target) ||
+          (draggedGroupName && ((e.sourceIsGroup && e.source === draggedGroupName) ||
+                                (e.targetIsGroup && e.target === draggedGroupName)));
       };
 
       parsed.edges.forEach((e, i) => {
         const els = d.edgeEls[i];
         if (!els || !els.path) return;
-        const src = e.sourceIsGroup ? groupRect(e.source) : nodeRect(e.source);
-        const tgt = e.targetIsGroup ? groupRect(e.target) : nodeRect(e.target);
+        if (!isAffected(e)) return; // every other edge keeps its route
+        const src = e.sourceIsGroup ? liveGroups.get(e.source) : liveById.get(e.source);
+        const tgt = e.targetIsGroup ? liveGroups.get(e.target) : liveById.get(e.target);
         if (!src || !tgt) return;
-        const sec = computeEdgeSection(e, src, tgt, dir);
+        const obstacles = buildRoutingObstacles(
+          liveRects, groupOfNode, e.source, e.target,
+          e.sourceIsGroup ? e.source : null, e.targetIsGroup ? e.target : null);
+        const sec = computeEdgeSection(e, src, tgt, dir, obstacles);
         els.path.setAttribute('d', sectionToPathD(sec));
         if (els.label) els.label.setAttribute('transform', `translate(${sec.labelX},${sec.labelY})`);
       });
@@ -11494,7 +11796,7 @@ Process > End`;
       // The containing group grows live around a dragged member
       if (d.kind === 'node' && d.groupIdx !== undefined) {
         const gr = lr.groups.find(g => g.idx === d.groupIdx);
-        const members = gr ? gr.members.map(nodeRect).filter(Boolean) : [];
+        const members = gr ? gr.members.map(id => liveById.get(id)).filter(Boolean) : [];
         if (members.length) {
           const gp = { top: 35, left: 15, bottom: 15, right: 15 };
           const x0 = Math.min(...members.map(m => m.x)) - gp.left;

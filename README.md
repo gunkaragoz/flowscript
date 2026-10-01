@@ -228,7 +228,7 @@ Backend [color: blue, pos: 340,40] { ... }   // group pinned
 
 - Dragging writes a `pos: x,y` property into the `.flow` text, so positions live in the file itself — they survive save, share, git, and version history
 - Positions snap to a 10px grid for tidy, readable `pos` values
-- Edges re-route **live while dragging** (attribute-only updates — no re-layout per frame)
+- Edges re-route **live while dragging** and **bend around intervening nodes** instead of cutting through them
 - Only dragged elements are pinned; everything else keeps auto-arranging (hybrid layout)
 - Groups automatically grow to keep containing their dragged members
 - Double-click a dragged node or group to release it back to full auto-layout
